@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Translator - {{ patient.name }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        .translator-bg {
+            background: linear-gradient(135deg, #F0FDFA 0%, #E0F2FE 100%);
+            min-height: 100vh;
+        }
+        .live-badge {
+            background: #EF4444;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            animation: pulse 1.5s infinite;
+        }
+        .transcript-entry {
+            padding: 10px 14px;
+            margin: 6px 0;
+            border-radius: 12px;
+            animation: fadeInUp 0.3s ease;
+        }
+        .transcript-patient {
+            background: #CCFBF1;
+            border-left: 4px solid #0D9488;
+            margin-right: 20%;
+        }
+        .transcript-doctor {
+            background: #DBEAFE;
+            border-left: 4px solid #3B82F6;
+            margin-left: 20%;
+        }
+        .transcript-system {
+            background: #FEF3C7;
+            border-left: 4px solid #F59E0B;
+            text-align: center;
+            font-size: 13px;
+            font-style: italic;
+        }
+        #translationActive { display: none; }
+        #appointmentSection { display: none; }
+        #prescriptionSection { display: none; }
+        #qrResult { display: none; }
+
+        /* Sign Language Avatar Styles */
+        .sign-avatar-wrap {
+            position: relative;
+            background: linear-gradient(135deg, #F0FDFA 0%, #E0F7FA 50%, #E8F5E9 100%);
+            border-radius: 16px;
+            border: 2px solid #B2DFDB;
+            padding: 8px;
+        }
+        .sign-avatar-svg {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .sign-avatar-panel {
+            background: #F8FFFE;
+            border: 2px solid #E0F2F1;
+            border-radius: 16px;
+            padding: 12px;
+            text-align: center;
+        }
+        .sign-progress-wrap {
+            margin-top: 8px;
+            padding: 0 16px;
+        }
+        .sign-progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #E0E7FF;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .sign-progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #3B82F6, #0D9488);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+        /* Quick Phrase buttons */
+        .qp-btn {
+            background: white;
+            border: 1.5px solid #E2E8F0;
+            border-radius: 8px;
+            padding: 6px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-align: center;
+            color: #334155;
+            font-weight: 500;
+        }
+        .qp-btn:hover {
+            border-color: #0D9488;
+            background: #F0FDFA;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        }
+        .qp-btn:active {
+            transform: translateY(0);
+            background: #CCFBF1;
+        }
+    </style>
+</head>
+<body class="translator-bg">
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-teal-700 to-teal-800 text-white py-3 px-6 flex items-center justify-between shadow-lg">
+        <div class="flex items-center gap-3">
+            <i class="fas fa-language text-2xl"></i>
+            <div>
+                <h1 class="text-lg font-bold">Real-Time Sign Language Translator</h1>
+                <p class="text-teal-200 text-sm">{{ hospital_name }}</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <!-- Top-left translate button (as per requirement) -->
+            <button id="translateBtn" onclick="toggleTranslation()" class="bg-white text-teal-700 px-4 py-2 rounded-lg font-semibold text-sm hover:bg-teal-50 transition">
+                <i class="fas fa-play mr-1"></i> Start Translation
+            </button>
+            <span id="liveBadge" class="live-badge" style="display:none;">
+                <i class="fas fa-circle text-xs mr-1"></i> LIVE
+            </span>
+            <a href="/staff" class="text-teal-200 hover:text-white text-sm">
+                <i class="fas fa-arrow-left mr-1"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Patient Info Bar -->
+    <div class="bg-white border-b px-6 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-4">
+            <span class="bg-teal-100 text-teal-700 px-3 py-1 rounded-full text-sm font-semibold">
+                <i class="fas fa-user mr-1"></i> {{ patient.name }}
+            </span>
+            <span class="text-gray-400">|</span>
+            <span class="text-sm text-gray-500">
+                <i class="fas fa-receipt mr-1"></i> {{ patient.receipt_number }}
+            </span>
+            <span class="text-gray-400">|</span>
+            <span class="text-sm text-gray-500">
+                <i class="fas fa-hospital mr-1"></i> {{ patient.department_name or 'General' }}
+            </span>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="text-sm text-gray-500">
+                <i class="fas fa-notes-medical mr-1"></i> {{ patient.triage_summary or 'No triage data' }}
+            </span>
+        </div>
+    </div>
+
+    <!-- Pre-translation: Patient Summary -->
+    <div id="preTranslation" class="max-w-4xl mx-auto px-4 py-8">
+        <div class="bg-white rounded-2xl p-8 shadow-lg text-center">
+            <div class="avatar-container mx-auto mb-4" style="width:150px;height:200px;" id="preAvatar"></div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">Patient Received</h2>
+            <p class="text-gray-500 mb-6">Review patient information, then click <strong>"Start Translation"</strong> (top right) to begin live translation.</p>
+
+            <div class="bg-teal-50 rounded-xl p-6 text-left max-w-md mx-auto">
+                <h3 class="font-semibold text-teal-800 mb-3">Patient Summary</h3>
+                <div class="space-y-2 text-sm">
+                    <p><strong>Name:</strong> {{ patient.name }}</p>
+                    <p><strong>Receipt:</strong> {{ patient.receipt_number }}</p>
+                    <p><strong>Department:</strong> {{ patient.department_name or 'General Practice' }}</p>
+                    <p><strong>Communication:</strong> {{ patient.communication_pref or 'Sign Language' }}</p>
+                    <p><strong>Triage Notes:</strong> {{ patient.triage_summary or 'General consultation' }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Translation View -->
+    <div id="translationActive" class="px-4 py-4">
+        <div class="translator-split max-w-7xl mx-auto">
+            <!-- Left: Patient Side (Webcam + Sign Detection → Text) -->
+            <div class="translator-panel" style="overflow-y:auto;">
+                <h3 class="font-semibold text-gray-700 mb-3 flex items-center justify-between">
+                    <span><i class="fas fa-user text-teal-600 mr-2"></i> Patient (Sign Language → Text)</span>
+                    <span class="text-xs bg-teal-100 text-teal-700 px-2 py-1 rounded-full">🤟 Signs detected here</span>
+                </h3>
+
+                <div class="webcam-container mx-auto" style="width:100%;max-width:500px;height:260px;">
+                    <video id="transVideo" autoplay playsinline></video>
+                    <canvas id="transCanvas" width="640" height="480"></canvas>
+                    <div class="webcam-label">Patient Camera</div>
+                    <div class="gesture-indicator" id="transGestureInd"></div>
+                </div>
+
+                <!-- Sentence Builder -->
+                <div class="bg-teal-50 rounded-xl p-3 mt-3" id="sentenceBuilderWrap">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold text-teal-700"><i class="fas fa-pen-fancy mr-1"></i> Sentence Builder</span>
+                        <div class="flex gap-1">
+                            <button onclick="undoLastSign()" class="text-xs bg-white text-teal-700 border border-teal-300 px-2 py-1 rounded hover:bg-teal-100" title="Undo last word">
+                                <i class="fas fa-undo"></i>
+                            </button>
+                            <button onclick="clearSentence()" class="text-xs bg-white text-red-500 border border-red-300 px-2 py-1 rounded hover:bg-red-50" title="Clear all">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="sentenceWords" class="flex flex-wrap gap-1 min-h-[32px] bg-white rounded-lg p-2 border-2 border-teal-200 mb-2">
+                        <span class="text-gray-300 italic text-sm" id="sentencePlaceholder">Sign words will appear here...</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="sendPatientSentence()" class="btn-primary text-xs py-2 flex-1" id="sendSentenceBtn" disabled>
+                            <i class="fas fa-paper-plane mr-1"></i> Send to Doctor
+                        </button>
+                        <span id="autoSendTimer" class="text-xs text-teal-600 self-center" style="display:none;">
+                            Auto-sending in <span id="autoSendCountdown">5</span>s...
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Quick Phrase Board -->
+                <div class="mt-3">
+                    <span class="text-xs font-bold text-gray-500 mb-2 block"><i class="fas fa-th mr-1"></i> Quick Phrases (tap to add)</span>
+                    <div class="grid grid-cols-3 gap-1" id="quickPhraseBoard">
+                        <button onclick="addQuickPhrase('Hello')" class="qp-btn">👋 Hello</button>
+                        <button onclick="addQuickPhrase('Yes')" class="qp-btn">👍 Yes</button>
+                        <button onclick="addQuickPhrase('No')" class="qp-btn">✊ No</button>
+                        <button onclick="addQuickPhrase('I have pain')" class="qp-btn">😣 I have pain</button>
+                        <button onclick="addQuickPhrase('Help me')" class="qp-btn">🆘 Help me</button>
+                        <button onclick="addQuickPhrase('Thank you')" class="qp-btn">🙏 Thank you</button>
+                        <button onclick="addQuickPhrase('I need medicine')" class="qp-btn">💊 Need medicine</button>
+                        <button onclick="addQuickPhrase('I feel dizzy')" class="qp-btn">😵 Feel dizzy</button>
+                        <button onclick="addQuickPhrase('I need water')" class="qp-btn">💧 Need water</button>
+                        <button onclick="addQuickPhrase('My head hurts')" class="qp-btn">🤕 Head hurts</button>
+                        <button onclick="addQuickPhrase('My stomach hurts')" class="qp-btn">🤢 Stomach hurts</button>
+                        <button onclick="addQuickPhrase('I cannot breathe')" class="qp-btn">😮‍💨 Can't breathe</button>
+                    </div>
+                </div>
+
+                <!-- Patient messages sent -->
+                <div class="translation-text mt-3" id="patientTranslation" style="max-height:140px;overflow-y:auto;">
+                    <p class="text-gray-400 italic text-center text-sm">Sent messages appear here...</p>
+                </div>
+
+                <div class="flex items-center gap-2 mt-2">
+                    <button onclick="speakLastPatientMessage()" class="btn-outline text-xs py-2">
+                        <i class="fas fa-volume-up mr-1"></i> Replay Last
+                    </button>
+                    <span class="text-xs text-gray-400">Audio plays when messages are sent</span>
+                </div>
+            </div>
+
+            <!-- Right: Doctor Side (Speech/Type → Animated Sign Language Character) -->
+            <div class="translator-panel" style="overflow-y:auto;">
+                <h3 class="font-semibold text-gray-700 mb-3 flex items-center justify-between">
+                    <span><i class="fas fa-user-md text-blue-600 mr-2"></i> Doctor → Sign Language</span>
+                    <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">🗣️ Speak or type</span>
+                </h3>
+
+                <!-- Doctor input methods -->
+                <div class="flex gap-2 mb-3">
+                    <button id="micBtn" onclick="toggleMicrophone()" class="btn-primary text-sm py-2 flex-shrink-0">
+                        <i class="fas fa-microphone mr-1"></i> Listen
+                    </button>
+                    <input type="text" id="doctorInput" class="flex-1 border-2 border-gray-200 rounded-lg px-3 py-2 text-sm"
+                           placeholder="Type message to patient..." onkeydown="if(event.key==='Enter')sendDoctorMessage()">
+                    <button onclick="sendDoctorMessage()" class="btn-outline text-sm py-2">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+
+                <!-- Sign Language Avatar (large, animated word-by-word) -->
+                <div class="sign-avatar-panel">
+                    <div id="signAvatarContainer" style="width:340px;max-width:100%;margin:0 auto;"></div>
+                    <!-- Progress bar for word-by-word signing -->
+                    <div id="signProgress" class="sign-progress-wrap" style="display:none;">
+                        <div class="sign-progress-bar">
+                            <div id="signProgressFill" class="sign-progress-fill"></div>
+                        </div>
+                        <div id="signProgressText" class="text-xs text-blue-600 text-center mt-1">Signing...</div>
+                    </div>
+                    <div id="avatarSignLabel" class="text-center text-sm text-gray-400 mt-2">
+                        <i class="fas fa-hand-sparkles mr-1"></i> Thandi will sign doctor's words here
+                    </div>
+                </div>
+
+                <!-- Doctor messages sent -->
+                <div class="translation-text mt-3" id="doctorTranslation" style="max-height:140px;overflow-y:auto;">
+                    <p class="text-gray-400 italic text-center text-sm">Doctor messages appear here...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transcript Log -->
+        <div class="max-w-7xl mx-auto mt-4">
+            <div class="bg-white rounded-2xl p-4 shadow-lg">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="font-semibold text-gray-700">
+                        <i class="fas fa-scroll mr-2"></i> Session Transcript
+                    </h3>
+                    <div class="flex gap-2">
+                        <button onclick="showAppointment()" class="btn-outline text-xs py-2">
+                            <i class="fas fa-calendar-plus mr-1"></i> Book Appointment
+                        </button>
+                        <button onclick="showPrescription()" class="btn-outline text-xs py-2">
+                            <i class="fas fa-prescription mr-1"></i> Write Prescription
+                        </button>
+                    </div>
+                </div>
+                <div id="transcriptLog" class="max-h-48 overflow-y-auto">
+                    <div class="transcript-entry transcript-system">Translation session started</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Appointment Booking -->
+        <div id="appointmentSection" class="max-w-md mx-auto mt-4">
+            <div class="bg-white rounded-2xl p-6 shadow-lg">
+                <h3 class="font-semibold text-gray-700 mb-4">
+                    <i class="fas fa-calendar-check mr-2 text-teal-600"></i> Book Follow-up Appointment
+                </h3>
+                <div class="space-y-3">
+                    <input type="date" id="aptDate" class="w-full border-2 border-gray-200 rounded-lg px-3 py-2">
+                    <input type="time" id="aptTime" class="w-full border-2 border-gray-200 rounded-lg px-3 py-2">
+                    <textarea id="aptNotes" class="w-full border-2 border-gray-200 rounded-lg px-3 py-2 text-sm"
+                              rows="2" placeholder="Notes..."></textarea>
+                    <div class="flex gap-2">
+                        <button onclick="generateAppointmentQR()" class="btn-primary text-sm flex-1">
+                            <i class="fas fa-qrcode mr-1"></i> Generate QR Code
+                        </button>
+                        <button onclick="hideAppointment()" class="btn-outline text-sm">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Prescription -->
+        <div id="prescriptionSection" class="max-w-md mx-auto mt-4">
+            <div class="bg-white rounded-2xl p-6 shadow-lg">
+                <h3 class="font-semibold text-gray-700 mb-4">
+                    <i class="fas fa-prescription-bottle-medical mr-2 text-teal-600"></i> Write Prescription
+                </h3>
+                <div class="space-y-3">
+                    <input type="text" id="rxMedication" class="w-full border-2 border-gray-200 rounded-lg px-3 py-2"
+                           placeholder="Medication name">
+                    <input type="text" id="rxDosage" class="w-full border-2 border-gray-200 rounded-lg px-3 py-2"
+                           placeholder="Dosage (e.g., 500mg twice daily)">
+                    <textarea id="rxInstructions" class="w-full border-2 border-gray-200 rounded-lg px-3 py-2 text-sm"
+                              rows="2" placeholder="Special instructions..."></textarea>
+                    <div class="flex gap-2">
+                        <button onclick="generatePrescriptionQR()" class="btn-primary text-sm flex-1">
+                            <i class="fas fa-qrcode mr-1"></i> Send to Pharmacy & Generate QR
+                        </button>
+                        <button onclick="hidePrescription()" class="btn-outline text-sm">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- QR Result -->
+        <div id="qrResult" class="max-w-md mx-auto mt-4">
+            <div class="qr-display">
+                <h3 class="font-bold text-lg mb-2" id="qrResultTitle">QR Code</h3>
+                <p class="text-sm text-gray-500 mb-3" id="qrResultDesc">Scan with patient's phone</p>
+                <img id="qrResultImage" src="" alt="QR Code">
+                <p class="text-sm text-gray-600 mt-3 whitespace-pre-line" id="qrResultDetails"></p>
+                <button onclick="hideQRResult()" class="btn-outline text-sm mt-4">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="/static/js/gesture.js"></script>
+    <script src="/static/js/avatar.js"></script>
+    <script src="/static/js/sign_avatar.js"></script>
+    <script>
+    // ─── State ───
+    const patientId = {{ patient.id }};
+    const patientData = {{ patient | tojson }};
+    let consultationId = null;
+    let isTranslating = false;
+    let gestureDetector = null;
+    let signAvatar = null;
+    let recognition = null;
+    let lastPatientMessage = '';
+    let isMicActive = false;
+    let patientMessages = [];
+    let doctorMessages = [];
+    let isSpeaking = false;
+    let speechQueue = [];
+
+    // ─── Sentence Builder State ───
+    let sentenceWords = [];
+    let autoSendTimerId = null;
+    const AUTO_SEND_DELAY = 6; // seconds
+
+    // Gesture → word mapping (individual words, not full sentences)
+    const GESTURE_WORD_MAP = {
+        'wave':      'Hello',
+        'thumbs_up': 'Yes',
+        'fist':      'No',
+        'open_palm': 'Please',
+        'peace':     'Thank you',
+        'ok_sign':   'OK',
+        'pointing':  null  // cycles through body-part words
+    };
+
+    // Cycle list for pointing gesture (medical context)
+    const POINTING_WORDS = ['Pain', 'Here', 'Head', 'Stomach', 'Chest', 'Arm', 'Leg', 'Back', 'Eye', 'Ear'];
+    let pointingIndex = 0;
+
+    // ─── Init ───
+    document.addEventListener('DOMContentLoaded', () => {
+        const preAvatar = new HealthcareAvatar('preAvatar');
+        preAvatar.setExpression('happy');
+    });
+
+    // ─── Translation Toggle ───
+    async function toggleTranslation() {
+        if (!isTranslating) {
+            isTranslating = true;
+            document.getElementById('preTranslation').style.display = 'none';
+            document.getElementById('translationActive').style.display = 'block';
+            document.getElementById('translateBtn').innerHTML = '<i class="fas fa-stop mr-1"></i> Stop Translation';
+            document.getElementById('liveBadge').style.display = 'inline-block';
+
+            // Init sign language avatar (word-by-word animated)
+            signAvatar = new SignLanguageAvatar('signAvatarContainer', { width: 340, height: 480 });
+
+            // Start consultation
+            try {
+                const resp = await fetch('/api/consultation/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        patient_id: patientId,
+                        staff_id: patientData.staff_id || 1
+                    })
+                });
+                const data = await resp.json();
+                consultationId = data.consultation_id;
+            } catch(e) {
+                console.error('Failed to start consultation:', e);
+            }
+
+            // Start webcam for sign detection
+            try {
+                gestureDetector = new GestureDetector();
+                const video = document.getElementById('transVideo');
+                const canvas = document.getElementById('transCanvas');
+                await gestureDetector.init(video, canvas, onPatientGesture);
+                await gestureDetector.start();
+            } catch(e) {
+                console.warn('Gesture detection unavailable:', e);
+            }
+
+            // Init speech recognition for doctor
+            initSpeechRecognition();
+
+        } else {
+            isTranslating = false;
+            document.getElementById('translateBtn').innerHTML = '<i class="fas fa-play mr-1"></i> Start Translation';
+            document.getElementById('liveBadge').style.display = 'none';
+            if (gestureDetector) gestureDetector.stop();
+            if (recognition) recognition.stop();
+        }
+    }
+
+    // ─── Patient Gesture → Sentence Builder ───
+    function onPatientGesture(gesture) {
+        const indicator = document.getElementById('transGestureInd');
+        const label = GESTURE_LABELS[gesture] || gesture;
+        indicator.textContent = label;
+        indicator.classList.add('active');
+        setTimeout(() => indicator.classList.remove('active'), 2000);
+
+        let word = GESTURE_WORD_MAP[gesture];
+        if (gesture === 'pointing') {
+            word = POINTING_WORDS[pointingIndex % POINTING_WORDS.length];
+            pointingIndex++;
+        }
+
+        if (word) {
+            addWordToSentence(word);
+        }
+    }
+
+    // ─── Sentence Builder Functions ───
+    function addWordToSentence(word) {
+        sentenceWords.push(word);
+        renderSentenceBuilder();
+        resetAutoSend();
+    }
+
+    function addQuickPhrase(phrase) {
+        // Split phrase into words and add each
+        const words = phrase.split(' ');
+        words.forEach(w => sentenceWords.push(w));
+        renderSentenceBuilder();
+        // Auto-send immediately for quick phrases
+        sendPatientSentence();
+    }
+
+    function undoLastSign() {
+        if (sentenceWords.length > 0) {
+            sentenceWords.pop();
+            renderSentenceBuilder();
+            if (sentenceWords.length > 0) resetAutoSend();
+            else cancelAutoSend();
+        }
+    }
+
+    function clearSentence() {
+        sentenceWords = [];
+        renderSentenceBuilder();
+        cancelAutoSend();
+    }
+
+    function renderSentenceBuilder() {
+        const container = document.getElementById('sentenceWords');
+        const placeholder = document.getElementById('sentencePlaceholder');
+        const sendBtn = document.getElementById('sendSentenceBtn');
+
+        if (sentenceWords.length === 0) {
+            container.innerHTML = '<span class="text-gray-300 italic text-sm" id="sentencePlaceholder">Sign words will appear here...</span>';
+            sendBtn.disabled = true;
+            return;
+        }
+
+        container.innerHTML = sentenceWords.map((w, i) =>
+            `<span class="inline-block bg-teal-100 text-teal-800 px-2 py-1 rounded-lg text-sm font-medium border border-teal-200 cursor-pointer hover:bg-red-100 hover:text-red-600 hover:border-red-300 transition" onclick="removeWord(${i})" title="Click to remove">${w}</span>`
+        ).join('');
+        sendBtn.disabled = false;
+    }
+
+    function removeWord(index) {
+        sentenceWords.splice(index, 1);
+        renderSentenceBuilder();
+        if (sentenceWords.length === 0) cancelAutoSend();
+    }
+
+    function sendPatientSentence() {
+        if (sentenceWords.length === 0) return;
+        const message = sentenceWords.join(' ');
+        cancelAutoSend();
+        sentenceWords = [];
+        renderSentenceBuilder();
+        addPatientMessage(message);
+    }
+
+    function resetAutoSend() {
+        cancelAutoSend();
+        let countdown = AUTO_SEND_DELAY;
+        const timerEl = document.getElementById('autoSendTimer');
+        const countEl = document.getElementById('autoSendCountdown');
+        timerEl.style.display = 'inline';
+        countEl.textContent = countdown;
+
+        autoSendTimerId = setInterval(() => {
+            countdown--;
+            countEl.textContent = countdown;
+            if (countdown <= 0) {
+                cancelAutoSend();
+                sendPatientSentence();
+            }
+        }, 1000);
+    }
+
+    function cancelAutoSend() {
+        if (autoSendTimerId) {
+            clearInterval(autoSendTimerId);
+            autoSendTimerId = null;
+        }
+        document.getElementById('autoSendTimer').style.display = 'none';
+    }
+
+    function addPatientMessage(message) {
+        lastPatientMessage = message;
+        patientMessages.push({ text: message, time: new Date().toLocaleTimeString() });
+
+        const container = document.getElementById('patientTranslation');
+        container.innerHTML = patientMessages.map(m =>
+            `<div class="flex items-start gap-2 mb-2">
+                <span class="text-teal-600 font-bold text-xs mt-1">🤟</span>
+                <div>
+                    <p class="text-teal-800 font-medium text-sm">${escapeHtml(m.text)}</p>
+                    <span class="text-xs text-gray-400">${m.time}</span>
+                </div>
+            </div>`
+        ).join('');
+        container.scrollTop = container.scrollHeight;
+        addTranscriptEntry('patient', message);
+        queueSpeak(message);
+
+        if (consultationId) {
+            fetch(`/api/consultation/${consultationId}/message`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sender: 'patient', message: message })
+            }).catch(console.error);
+        }
+    }
+
+    function speakLastPatientMessage() {
+        if (lastPatientMessage) queueSpeak(lastPatientMessage);
+    }
+
+    // ─── Doctor Speech Recognition ───
+    function initSpeechRecognition() {
+        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+            console.warn('Speech recognition not available');
+            return;
+        }
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-ZA';
+
+        recognition.onresult = (event) => {
+            let finalTranscript = '';
+            let interimTranscript = '';
+
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const transcript = event.results[i][0].transcript;
+                if (event.results[i].isFinal) {
+                    finalTranscript += transcript;
+                } else {
+                    interimTranscript += transcript;
+                }
+            }
+
+            if (interimTranscript && !finalTranscript) {
+                document.getElementById('avatarSignLabel').innerHTML =
+                    `<span class="text-gray-400 italic text-xs"><i class="fas fa-microphone mr-1"></i> Hearing: "${interimTranscript}"</span>`;
+            }
+
+            if (finalTranscript) {
+                processDoctorMessage(finalTranscript.trim());
+            }
+        };
+
+        recognition.onerror = (e) => console.warn('Speech recognition error:', e.error);
+    }
+
+    function toggleMicrophone() {
+        if (!recognition) {
+            alert('Speech recognition not available in this browser. Please use Chrome.');
+            return;
+        }
+
+        if (isMicActive) {
+            recognition.stop();
+            isMicActive = false;
+            document.getElementById('micBtn').innerHTML = '<i class="fas fa-microphone mr-1"></i> Listen';
+            document.getElementById('micBtn').classList.remove('bg-red-500');
+        } else {
+            recognition.start();
+            isMicActive = true;
+            document.getElementById('micBtn').innerHTML = '<i class="fas fa-microphone-slash mr-1"></i> Listening...';
+            document.getElementById('micBtn').classList.add('bg-red-500');
+        }
+    }
+
+    function sendDoctorMessage() {
+        const input = document.getElementById('doctorInput');
+        const message = input.value.trim();
+        if (!message) return;
+        input.value = '';
+        processDoctorMessage(message);
+    }
+
+    function processDoctorMessage(message) {
+        doctorMessages.push({ text: message, time: new Date().toLocaleTimeString() });
+
+        const container = document.getElementById('doctorTranslation');
+        container.innerHTML = doctorMessages.map(m =>
+            `<div class="flex items-start gap-2 mb-2">
+                <span class="text-blue-600 font-bold text-xs mt-1">🩺</span>
+                <div>
+                    <p class="text-blue-800 font-medium text-sm">${escapeHtml(m.text)}</p>
+                    <span class="text-xs text-gray-400">${m.time}</span>
+                </div>
+            </div>`
+        ).join('');
+        container.scrollTop = container.scrollHeight;
+
+        // Use the new sign language avatar to sign word-by-word
+        if (signAvatar) {
+            const progressWrap = document.getElementById('signProgress');
+            const progressFill = document.getElementById('signProgressFill');
+            const progressText = document.getElementById('signProgressText');
+            const label = document.getElementById('avatarSignLabel');
+
+            progressWrap.style.display = 'block';
+
+            signAvatar.signSentence(message, {
+                msPerSign: 1200,
+                onWord: (word, idx, total) => {
+                    const pct = ((idx + 1) / total * 100).toFixed(0);
+                    progressFill.style.width = pct + '%';
+                    progressText.textContent = `Signing: "${word}" (${idx + 1}/${total})`;
+                    label.innerHTML = `<span class="text-blue-600 font-semibold text-base">🤟 Signing: "${escapeHtml(word)}"</span>`;
+                },
+                onDone: () => {
+                    progressWrap.style.display = 'none';
+                    progressFill.style.width = '0%';
+                    label.innerHTML = '<span class="text-green-600"><i class="fas fa-check-circle mr-1"></i> Done signing message</span>';
+                    setTimeout(() => {
+                        label.innerHTML = '<i class="fas fa-hand-sparkles mr-1"></i> Thandi will sign doctor\'s words here';
+                    }, 3000);
+                }
+            });
+        }
+
+        addTranscriptEntry('doctor', message);
+
+        if (consultationId) {
+            fetch(`/api/consultation/${consultationId}/message`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sender: 'doctor', message: message })
+            }).catch(console.error);
+        }
+    }
+
+    // ─── Transcript ───
+    function addTranscriptEntry(sender, message) {
+        const log = document.getElementById('transcriptLog');
+        const cls = sender === 'patient' ? 'transcript-patient' : 'transcript-doctor';
+        const icon = sender === 'patient' ? '🤟' : '🩺';
+        const label = sender === 'patient' ? 'Patient' : 'Doctor';
+
+        log.innerHTML += `
+            <div class="transcript-entry ${cls}">
+                <span class="text-xs text-gray-400">${icon} ${label} - ${new Date().toLocaleTimeString()}</span>
+                <p class="text-sm mt-1">${escapeHtml(message)}</p>
+            </div>`;
+        log.scrollTop = log.scrollHeight;
+    }
+
+    // ─── Text-to-Speech (queued, no overlapping) ───
+    function queueSpeak(text) {
+        speechQueue.push(text);
+        if (!isSpeaking) processQueue();
+    }
+
+    function processQueue() {
+        if (speechQueue.length === 0) { isSpeaking = false; return; }
+        isSpeaking = true;
+        const text = speechQueue.shift();
+        if ('speechSynthesis' in window) {
+            speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'en-ZA';
+            utterance.rate = 0.9;
+            utterance.onend = () => processQueue();
+            utterance.onerror = () => processQueue();
+            speechSynthesis.speak(utterance);
+        } else {
+            isSpeaking = false;
+        }
+    }
+
+    function speak(text) { queueSpeak(text); }
+
+    // ─── HTML escaping for XSS prevention ───
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.appendChild(document.createTextNode(text));
+        return div.innerHTML;
+    }
+
+    // ─── Appointment QR ───
+    function showAppointment() {
+        document.getElementById('appointmentSection').style.display = 'block';
+        document.getElementById('prescriptionSection').style.display = 'none';
+    }
+    function hideAppointment() {
+        document.getElementById('appointmentSection').style.display = 'none';
+    }
+
+    async function generateAppointmentQR() {
+        const date = document.getElementById('aptDate').value;
+        const time = document.getElementById('aptTime').value;
+        const notes = document.getElementById('aptNotes').value;
+
+        if (!date || !time) {
+            alert('Please enter date and time');
+            return;
+        }
+
+        try {
+            const resp = await fetch('/api/qr/appointment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    patient_id: patientId,
+                    date: date,
+                    time: time,
+                    notes: notes
+                })
+            });
+            const data = await resp.json();
+            showQRResult('Appointment QR Code',
+                'Patient can scan this for appointment details',
+                data.qr_image,
+                data.display_text);
+            hideAppointment();
+            addTranscriptEntry('doctor', `Appointment booked: ${date} at ${time}`);
+        } catch(e) {
+            alert('Failed to generate QR code');
+        }
+    }
+
+    // ─── Prescription QR ───
+    function showPrescription() {
+        document.getElementById('prescriptionSection').style.display = 'block';
+        document.getElementById('appointmentSection').style.display = 'none';
+    }
+    function hidePrescription() {
+        document.getElementById('prescriptionSection').style.display = 'none';
+    }
+
+    async function generatePrescriptionQR() {
+        const medication = document.getElementById('rxMedication').value;
+        const dosage = document.getElementById('rxDosage').value;
+        const instructions = document.getElementById('rxInstructions').value;
+
+        if (!medication || !dosage) {
+            alert('Please enter medication and dosage');
+            return;
+        }
+
+        try {
+            const resp = await fetch('/api/qr/prescription', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    patient_id: patientId,
+                    consultation_id: consultationId,
+                    medication: medication,
+                    dosage: dosage,
+                    instructions: instructions
+                })
+            });
+            const data = await resp.json();
+            showQRResult('Prescription QR Code',
+                'Pharmacy has been notified. Patient can scan for details.',
+                data.qr_image,
+                `Medication: ${medication}\nDosage: ${dosage}\nInstructions: ${instructions}`);
+            hidePrescription();
+            addTranscriptEntry('doctor', `Prescription: ${medication} - ${dosage}`);
+
+            // Notify in transcript
+            const log = document.getElementById('transcriptLog');
+            log.innerHTML += `<div class="transcript-entry transcript-system">📋 Prescription sent to pharmacy</div>`;
+        } catch(e) {
+            alert('Failed to generate prescription QR');
+        }
+    }
+
+    // ─── QR Result Display ───
+    function showQRResult(title, desc, image, details) {
+        document.getElementById('qrResultTitle').textContent = title;
+        document.getElementById('qrResultDesc').textContent = desc;
+        document.getElementById('qrResultImage').src = 'data:image/png;base64,' + image;
+        document.getElementById('qrResultDetails').textContent = details;
+        document.getElementById('qrResult').style.display = 'block';
+    }
+
+    function hideQRResult() {
+        document.getElementById('qrResult').style.display = 'none';
+    }
+    </script>
+</body>
+</html>

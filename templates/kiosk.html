@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ hospital_name }} - Healthcare Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        .kiosk-bg {
+            background: linear-gradient(135deg, #F0FDFA 0%, #CCFBF1 50%, #E0F2FE 100%);
+            min-height: 100vh;
+        }
+        .wave-prompt {
+            animation: pulse 2s infinite;
+            font-size: 72px;
+        }
+        .header-bar {
+            background: linear-gradient(90deg, #0D9488, #0F766E);
+        }
+        #nameModal { display: none; }
+        #nameModal.show { display: flex; }
+        #modeSelect { display: none; }
+        #triageArea { display: none; }
+        #resultArea { display: none; }
+    </style>
+</head>
+<body class="kiosk-bg">
+    <!-- Header -->
+    <div class="header-bar text-white py-3 px-6 flex items-center justify-between shadow-lg">
+        <div class="flex items-center gap-3">
+            <i class="fas fa-hospital text-2xl"></i>
+            <div>
+                <h1 class="text-xl font-bold">{{ hospital_name }}</h1>
+                <p class="text-teal-200 text-sm">AI Healthcare Assistant</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <span id="statusBadge" class="bg-teal-600 px-3 py-1 rounded-full text-sm">
+                <i class="fas fa-circle text-yellow-300 text-xs mr-1"></i> Waiting for patient
+            </span>
+            <span class="text-sm opacity-75" id="clockDisplay"></span>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="max-w-6xl mx-auto px-4 py-6">
+
+        <!-- ─── Stage 1: Wave to Start ─── -->
+        <div id="waveStage" class="text-center py-12 fade-in">
+            <div class="wave-prompt mb-6">👋</div>
+            <h2 class="text-3xl font-bold text-gray-800 mb-3">Wave to Start</h2>
+            <p class="text-lg text-gray-500 mb-8">Wave your hand at the camera to begin</p>
+
+            <div class="flex justify-center mb-8">
+                <div class="webcam-container" id="webcamBox">
+                    <video id="webcamVideo" autoplay playsinline></video>
+                    <canvas id="webcamCanvas" width="640" height="480"></canvas>
+                    <div class="webcam-label">📷 Camera Active</div>
+                    <div class="gesture-indicator" id="gestureIndicator">Detected!</div>
+                </div>
+            </div>
+
+            <button onclick="skipToStart()" class="btn-outline text-sm">
+                <i class="fas fa-hand-pointer mr-2"></i> Or tap here to start
+            </button>
+        </div>
+
+        <!-- ─── Stage 2: Name Entry Modal ─── -->
+        <div id="nameModal" class="modal-overlay">
+            <div class="modal-content text-center">
+                <div class="text-5xl mb-4">🏥</div>
+                <h3 class="text-xl font-bold mb-2">Welcome!</h3>
+                <p class="text-gray-500 mb-4">Please enter your name to continue</p>
+                <input type="text" id="patientNameInput" class="name-input mb-4"
+                       placeholder="Your name..." autocomplete="off">
+                <br>
+                <button onclick="submitName()" class="btn-primary mt-3 w-full">
+                    Continue <i class="fas fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- ─── Stage 3: Communication Mode Selection ─── -->
+        <div id="modeSelect" class="text-center py-8 fade-in-up">
+            <div class="mb-8">
+                <div class="avatar-container mx-auto" id="avatarContainer"></div>
+                <div class="speech-bubble" id="modeSpeechBubble">
+                    Hello <span id="greetName"></span>! I'm <strong>Thandi</strong>, your healthcare assistant.
+                    How would you like to communicate today?
+                </div>
+            </div>
+
+            <div class="flex justify-center gap-8 flex-wrap">
+                <!-- Left: Text Communication -->
+                <div class="mode-btn" onclick="selectMode('text')">
+                    <div class="icon">⌨️</div>
+                    <div class="label">Communicate via Text</div>
+                    <div class="desc">Type your responses using the on-screen options</div>
+                </div>
+
+                <!-- Right: Sign Language -->
+                <div class="mode-btn" onclick="selectMode('sign')">
+                    <div class="icon">🤟</div>
+                    <div class="label">South African Sign Language</div>
+                    <div class="desc">Use sign language with camera assistance</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ─── Stage 4: Triage Conversation ─── -->
+        <div id="triageArea" class="fade-in-up">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Left: Webcam (sign mode) -->
+                <div id="signWebcamPanel" class="hidden lg:block">
+                    <div class="bg-white rounded-2xl p-4 shadow-lg">
+                        <h3 class="text-sm font-semibold text-gray-500 mb-2">
+                            <i class="fas fa-camera mr-1"></i> Your Camera
+                        </h3>
+                        <div class="webcam-container mx-auto" style="width:100%;height:320px;">
+                            <video id="signVideo" autoplay playsinline></video>
+                            <canvas id="signCanvas" width="640" height="480"></canvas>
+                            <div class="gesture-indicator" id="signGestureInd">👌</div>
+                        </div>
+                        <div id="gestureLabel" class="text-center text-sm text-gray-500 mt-2">
+                            Show gestures to interact
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Center: Avatar + Conversation -->
+                <div class="lg:col-span-2">
+                    <div class="bg-white rounded-2xl p-6 shadow-lg">
+                        <div class="flex items-start gap-4 mb-4">
+                            <div class="avatar-container" style="width:120px;height:160px;" id="triageAvatarContainer"></div>
+                            <div class="flex-1">
+                                <div class="speech-bubble" id="triageSpeechBubble" style="margin:0;">
+                                    Loading...
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Chat history -->
+                        <div class="chat-messages" id="chatHistory"></div>
+
+                        <!-- Options -->
+                        <div class="option-grid" id="triageOptions"></div>
+
+                        <!-- Progress bar -->
+                        <div class="mt-4">
+                            <div class="flex justify-between text-xs text-gray-400 mb-1">
+                                <span>Progress</span>
+                                <span id="progressLabel">Step 1</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div id="progressBar" class="bg-teal-500 h-2 rounded-full transition-all duration-500" style="width: 10%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ─── Stage 5: Results + QR Code ─── -->
+        <div id="resultArea" class="fade-in-up">
+            <div class="max-w-2xl mx-auto">
+                <div class="bg-white rounded-2xl p-8 shadow-lg text-center">
+                    <div class="avatar-container mx-auto mb-4" style="width:120px;height:160px;" id="resultAvatarContainer"></div>
+
+                    <div class="speech-bubble" id="resultSpeechBubble">
+                        Thank you for your patience! Here's your information.
+                    </div>
+
+                    <div class="bg-teal-50 rounded-xl p-6 mt-6 text-left">
+                        <h3 class="font-bold text-lg text-teal-800 mb-3">
+                            <i class="fas fa-clipboard-check mr-2"></i> Your Visit Summary
+                        </h3>
+                        <div class="space-y-2 text-sm">
+                            <p><strong>Patient:</strong> <span id="resultName"></span></p>
+                            <p><strong>Receipt Number:</strong> <span id="resultReceipt" class="font-mono bg-teal-100 px-2 py-1 rounded"></span></p>
+                            <p><strong>Assigned Department:</strong> <span id="resultDept" class="text-teal-700 font-semibold"></span></p>
+                            <p><strong>Location:</strong> <span id="resultLocation"></span></p>
+                            <p id="resultDirectionsRow"><strong>Directions:</strong> <span id="resultDirections" class="text-gray-600"></span></p>
+                            <p><strong>Assigned To:</strong> <span id="resultDoctor"></span></p>
+                        </div>
+                    </div>
+
+                    <!-- QR Code -->
+                    <div id="qrSection" class="qr-display mt-6" style="display:none;">
+                        <h3 class="font-bold text-lg mb-2">
+                            <i class="fas fa-qrcode mr-2 text-teal-600"></i> Scan for Directions
+                        </h3>
+                        <p class="text-sm text-gray-500 mb-3">
+                            Scan this QR code with your phone to get GPS directions to your department
+                        </p>
+                        <img id="qrImage" src="" alt="QR Code">
+                        <p class="text-xs text-gray-400 mt-2" id="qrMapLink"></p>
+                    </div>
+
+                    <div class="mt-6 flex justify-center gap-4">
+                        <button onclick="window.print()" class="btn-outline">
+                            <i class="fas fa-print mr-2"></i> Print
+                        </button>
+                        <button onclick="resetKiosk()" class="btn-primary">
+                            <i class="fas fa-redo mr-2"></i> New Patient
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="/static/js/gesture.js"></script>
+    <script src="/static/js/avatar.js"></script>
+    <script>
+    // ─── State ───
+    let patientName = '';
+    let commMode = 'text';
+    let triageFlow = [];
+    let currentStep = null;
+    let answers = [];
+    let stepHistory = [];
+    let gestureDetector = null;
+    let avatar = null;
+    let triageAvatar = null;
+    let resultAvatar = null;
+
+    // ─── Clock ───
+    function updateClock() {
+        const now = new Date();
+        document.getElementById('clockDisplay').textContent = now.toLocaleTimeString();
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // ─── Initialize ───
+    document.addEventListener('DOMContentLoaded', async () => {
+        // Fetch triage flow
+        try {
+            const resp = await fetch('/api/triage/flow');
+            const data = await resp.json();
+            triageFlow = data.flow;
+        } catch(e) {
+            console.error('Failed to fetch triage flow:', e);
+        }
+
+        // Initialize gesture detection
+        try {
+            gestureDetector = new GestureDetector();
+            const video = document.getElementById('webcamVideo');
+            const canvas = document.getElementById('webcamCanvas');
+            await gestureDetector.init(video, canvas, onGestureDetected);
+            await gestureDetector.start();
+        } catch(e) {
+            console.warn('Gesture detection unavailable:', e);
+        }
+    });
+
+    // ─── Gesture Handler ───
+    function onGestureDetected(gesture) {
+        const indicator = document.getElementById('gestureIndicator');
+        if (gesture === 'wave') {
+            indicator.textContent = '👋 Wave Detected!';
+            indicator.classList.add('active');
+            setTimeout(() => indicator.classList.remove('active'), 2000);
+
+            // If we're on wave stage, proceed
+            const waveStage = document.getElementById('waveStage');
+            if (waveStage.style.display !== 'none') {
+                startInteraction();
+            }
+        }
+    }
+
+    // ─── Navigation Functions ───
+    function skipToStart() {
+        startInteraction();
+    }
+
+    function startInteraction() {
+        // Stop initial webcam gesture detection
+        if (gestureDetector) gestureDetector.stop();
+
+        document.getElementById('waveStage').style.display = 'none';
+        document.getElementById('nameModal').classList.add('show');
+        document.getElementById('statusBadge').innerHTML =
+            '<i class="fas fa-circle text-green-300 text-xs mr-1"></i> Session Active';
+
+        setTimeout(() => document.getElementById('patientNameInput').focus(), 300);
+    }
+
+    function submitName() {
+        patientName = document.getElementById('patientNameInput').value.trim() || 'Patient';
+        document.getElementById('nameModal').classList.remove('show');
+        document.getElementById('modeSelect').style.display = 'block';
+        document.getElementById('greetName').textContent = patientName;
+
+        // Initialize avatar
+        avatar = new HealthcareAvatar('avatarContainer');
+        avatar.animateWave();
+    }
+
+    // Handle Enter key for name input
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && document.getElementById('nameModal').classList.contains('show')) {
+            submitName();
+        }
+    });
+
+    function selectMode(mode) {
+        commMode = mode;
+        document.getElementById('modeSelect').style.display = 'none';
+        document.getElementById('triageArea').style.display = 'block';
+
+        // Initialize triage avatar
+        triageAvatar = new HealthcareAvatar('triageAvatarContainer');
+
+        // Show webcam panel for sign mode
+        if (mode === 'sign') {
+            document.getElementById('signWebcamPanel').classList.remove('hidden');
+            initSignWebcam();
+        }
+
+        // Start triage
+        loadStep('greeting');
+    }
+
+    async function initSignWebcam() {
+        try {
+            const signDetector = new GestureDetector();
+            const video = document.getElementById('signVideo');
+            const canvas = document.getElementById('signCanvas');
+            await signDetector.init(video, canvas, (gesture) => {
+                const label = GESTURE_LABELS[gesture] || gesture;
+                document.getElementById('signGestureInd').textContent = label;
+                document.getElementById('signGestureInd').classList.add('active');
+                document.getElementById('gestureLabel').textContent = label;
+                setTimeout(() => {
+                    document.getElementById('signGestureInd').classList.remove('active');
+                }, 2000);
+
+                // Map gestures to option selection
+                if (gesture === 'thumbs_up' && currentStep) {
+                    // Select first option
+                    const options = currentStep.options;
+                    if (options && options.length > 0) {
+                        selectOption(options[0]);
+                    }
+                }
+            });
+            await signDetector.start();
+        } catch(e) {
+            console.warn('Sign webcam unavailable:', e);
+        }
+    }
+
+    // ─── Triage Flow ───
+    function loadStep(stepId) {
+        const step = triageFlow.find(s => s.id === stepId);
+        if (!step) return;
+
+        currentStep = step;
+        stepHistory.push(stepId);
+
+        // Update avatar
+        if (triageAvatar) {
+            triageAvatar.animateSigning(2000);
+        }
+
+        // Update speech bubble
+        document.getElementById('triageSpeechBubble').textContent = step.message;
+
+        // Update progress
+        const progress = Math.min((stepHistory.length / 8) * 100, 95);
+        document.getElementById('progressBar').style.width = progress + '%';
+        document.getElementById('progressLabel').textContent = `Step ${stepHistory.length}`;
+
+        // Render options
+        const optionsDiv = document.getElementById('triageOptions');
+        optionsDiv.innerHTML = '';
+
+        if (step.text_input) {
+            // Show text input for "other" steps
+            optionsDiv.innerHTML = `
+                <div class="w-full px-2">
+                    <textarea id="otherInput" class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-base focus:border-teal-500 focus:outline-none"
+                              rows="3" placeholder="Type what you are feeling here..."></textarea>
+                    <button onclick="submitOtherInput('${step.next || 'duration'}')" class="btn-primary mt-3 w-full">
+                        <i class="fas fa-arrow-right mr-2"></i> Continue
+                    </button>
+                </div>
+            `;
+        } else if (step.options && step.options.length > 0) {
+            step.options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.textContent = opt.label;
+                btn.onclick = () => selectOption(opt);
+                optionsDiv.appendChild(btn);
+            });
+        }
+
+        // Check if this is a final step
+        if (step.is_final) {
+            completeTriage();
+        }
+    }
+
+    function selectOption(option) {
+        // Add to chat history
+        const chatDiv = document.getElementById('chatHistory');
+        // Bot message
+        chatDiv.innerHTML += `<div class="chat-msg bot">${currentStep.message}</div>`;
+        // User response
+        chatDiv.innerHTML += `<div class="chat-msg user">${option.label}</div>`;
+        chatDiv.scrollTop = chatDiv.scrollHeight;
+
+        // Record answer
+        answers.push({
+            step: currentStep.id,
+            value: option.value,
+            label: option.label
+        });
+
+        // Navigate to next step
+        if (option.next) {
+            loadStep(option.next);
+        }
+    }
+
+    function submitOtherInput(nextStep) {
+        const input = document.getElementById('otherInput');
+        const text = (input ? input.value.trim() : '') || 'Other symptoms';
+
+        const chatDiv = document.getElementById('chatHistory');
+        chatDiv.innerHTML += `<div class="chat-msg bot">${currentStep.message}</div>`;
+        chatDiv.innerHTML += `<div class="chat-msg user">✏️ ${text}</div>`;
+        chatDiv.scrollTop = chatDiv.scrollHeight;
+
+        answers.push({
+            step: currentStep.id,
+            value: 'other_custom',
+            label: text
+        });
+
+        loadStep(nextStep);
+    }
+
+    // ─── Complete Triage ───
+    async function completeTriage() {
+        document.getElementById('triageOptions').innerHTML = `
+            <div class="text-center py-4">
+                <div class="loading-dots">
+                    <span></span><span></span><span></span>
+                </div>
+                <p class="text-sm text-gray-500 mt-2">Analyzing your information...</p>
+            </div>
+        `;
+
+        // Check if patient needs directions
+        const lastAnswer = answers[answers.length - 1];
+        const needsDirections = lastAnswer && lastAnswer.value === 'not_familiar';
+
+        try {
+            const resp = await fetch('/api/triage/complete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: patientName,
+                    answers: answers,
+                    communication_preference: commMode,
+                    needs_directions: needsDirections
+                })
+            });
+
+            const data = await resp.json();
+            showResults(data);
+        } catch(e) {
+            console.error('Triage completion failed:', e);
+            document.getElementById('triageOptions').innerHTML =
+                '<p class="text-red-500">Something went wrong. Please try again.</p>';
+        }
+    }
+
+    function showResults(data) {
+        document.getElementById('triageArea').style.display = 'none';
+        document.getElementById('resultArea').style.display = 'block';
+
+        // Initialize result avatar
+        resultAvatar = new HealthcareAvatar('resultAvatarContainer');
+        resultAvatar.setExpression('happy');
+
+        const patient = data.patient;
+        const dept = data.department;
+
+        document.getElementById('resultName').textContent = patient.name;
+        document.getElementById('resultReceipt').textContent = patient.receipt_number;
+        document.getElementById('resultDept').textContent = dept.name;
+        document.getElementById('resultLocation').textContent = dept.location;
+        document.getElementById('resultDirections').textContent = dept.directions || '';
+        document.getElementById('resultDirectionsRow').style.display = dept.directions ? 'block' : 'none';
+        document.getElementById('resultDoctor').textContent = patient.staff_name || 'Next Available';
+
+        document.getElementById('resultSpeechBubble').textContent =
+            `Thank you, ${patient.name}! You've been assigned to ${dept.name}. ` +
+            `Your receipt number is ${patient.receipt_number}. A medical professional will see you soon.`;
+
+        // Show QR code if available
+        if (data.qr_directions) {
+            document.getElementById('qrSection').style.display = 'block';
+            document.getElementById('qrImage').src =
+                'data:image/png;base64,' + data.qr_directions.qr_image;
+            document.getElementById('qrMapLink').innerHTML =
+                `<a href="${data.qr_directions.maps_url}" target="_blank" class="text-teal-600 underline">
+                    Open in Google Maps
+                </a>`;
+        }
+
+        document.getElementById('statusBadge').innerHTML =
+            '<i class="fas fa-circle text-green-300 text-xs mr-1"></i> Triage Complete';
+    }
+
+    function resetKiosk() {
+        patientName = '';
+        commMode = 'text';
+        answers = [];
+        stepHistory = [];
+        currentStep = null;
+
+        document.getElementById('resultArea').style.display = 'none';
+        document.getElementById('waveStage').style.display = 'block';
+        document.getElementById('chatHistory').innerHTML = '';
+        document.getElementById('qrSection').style.display = 'none';
+        document.getElementById('patientNameInput').value = '';
+        document.getElementById('statusBadge').innerHTML =
+            '<i class="fas fa-circle text-yellow-300 text-xs mr-1"></i> Waiting for patient';
+
+        // Restart gesture detection
+        if (gestureDetector) {
+            gestureDetector.start().catch(console.warn);
+        }
+    }
+    </script>
+</body>
+</html>

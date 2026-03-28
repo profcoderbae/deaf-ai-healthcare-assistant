@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Dashboard - {{ hospital_name }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        .dashboard-bg {
+            background: linear-gradient(135deg, #F0FDFA 0%, #F8FAFC 100%);
+            min-height: 100vh;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            transition: all 0.2s;
+        }
+        .stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .refresh-spin { animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="dashboard-bg">
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-slate-800 to-slate-900 text-white py-4 px-6 flex items-center justify-between shadow-lg">
+        <div class="flex items-center gap-3">
+            <i class="fas fa-hospital-user text-2xl text-teal-400"></i>
+            <div>
+                <h1 class="text-xl font-bold">Staff Dashboard</h1>
+                <p class="text-slate-400 text-sm">{{ hospital_name }} - Deaf Patient Management</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <button onclick="refreshPatients()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm transition">
+                <i class="fas fa-sync-alt mr-1" id="refreshIcon"></i> Refresh
+            </button>
+            <a href="/" class="text-slate-400 hover:text-white text-sm">
+                <i class="fas fa-desktop mr-1"></i> Kiosk View
+            </a>
+            <span class="text-sm text-slate-400" id="dashClock"></span>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-6 py-6">
+        <!-- Stats Row -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="stat-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-500">Waiting Patients</p>
+                        <p class="text-3xl font-bold text-amber-600" id="statWaiting">0</p>
+                    </div>
+                    <div class="text-4xl text-amber-200"><i class="fas fa-clock"></i></div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-500">In Consultation</p>
+                        <p class="text-3xl font-bold text-blue-600" id="statActive">0</p>
+                    </div>
+                    <div class="text-4xl text-blue-200"><i class="fas fa-stethoscope"></i></div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-500">Completed Today</p>
+                        <p class="text-3xl font-bold text-green-600" id="statDone">0</p>
+                    </div>
+                    <div class="text-4xl text-green-200"><i class="fas fa-check-circle"></i></div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-500">AI Provider</p>
+                        <p class="text-lg font-bold text-teal-600">Active</p>
+                    </div>
+                    <div class="text-4xl text-teal-200"><i class="fas fa-robot"></i></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Patient Queue -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+                    <div class="px-6 py-4 border-b bg-gradient-to-r from-teal-50 to-white flex items-center justify-between">
+                        <h2 class="font-bold text-gray-800">
+                            <i class="fas fa-list-ol mr-2 text-teal-600"></i> Patient Queue
+                        </h2>
+                        <span class="text-xs text-gray-400">Auto-refreshes every 15 seconds</span>
+                    </div>
+
+                    <!-- Tabs -->
+                    <div class="flex border-b">
+                        <button onclick="switchTab('waiting')" id="tabWaiting"
+                                class="flex-1 py-3 text-sm font-semibold text-center border-b-2 border-amber-500 text-amber-700 bg-amber-50 transition">
+                            <i class="fas fa-clock mr-1"></i> Waiting <span id="tabWaitingCount" class="bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full text-xs ml-1">0</span>
+                        </button>
+                        <button onclick="switchTab('in_consultation')" id="tabConsultation"
+                                class="flex-1 py-3 text-sm font-semibold text-center border-b-2 border-transparent text-gray-500 hover:bg-gray-50 transition">
+                            <i class="fas fa-stethoscope mr-1"></i> In Consultation <span id="tabConsultCount" class="bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full text-xs ml-1">0</span>
+                        </button>
+                        <button onclick="switchTab('completed')" id="tabCompleted"
+                                class="flex-1 py-3 text-sm font-semibold text-center border-b-2 border-transparent text-gray-500 hover:bg-gray-50 transition">
+                            <i class="fas fa-check-circle mr-1"></i> Completed <span id="tabCompletedCount" class="bg-green-200 text-green-800 px-2 py-0.5 rounded-full text-xs ml-1">0</span>
+                        </button>
+                    </div>
+
+                    <div id="patientQueue" class="p-4 space-y-3">
+                        <div class="text-center py-12 text-gray-400">
+                            <i class="fas fa-inbox text-5xl mb-3"></i>
+                            <p>No patients waiting</p>
+                            <p class="text-sm mt-1">Patients will appear here after completing kiosk triage</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div>
+                <div class="bg-white rounded-2xl shadow-lg p-6 mb-4">
+                    <h3 class="font-bold text-gray-800 mb-4">
+                        <i class="fas fa-bolt mr-2 text-amber-500"></i> Quick Actions
+                    </h3>
+                    <div class="space-y-3">
+                        <a href="/" target="_blank"
+                           class="block w-full text-left px-4 py-3 bg-teal-50 rounded-xl text-teal-700 hover:bg-teal-100 transition text-sm font-medium">
+                            <i class="fas fa-desktop mr-2"></i> Open Kiosk in New Tab
+                        </a>
+                        <button onclick="refreshPatients()"
+                                class="block w-full text-left px-4 py-3 bg-blue-50 rounded-xl text-blue-700 hover:bg-blue-100 transition text-sm font-medium">
+                            <i class="fas fa-sync mr-2"></i> Refresh Patient List
+                        </button>
+                        <button onclick="showDepartments()"
+                                class="block w-full text-left px-4 py-3 bg-purple-50 rounded-xl text-purple-700 hover:bg-purple-100 transition text-sm font-medium">
+                            <i class="fas fa-sitemap mr-2"></i> View Departments
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Departments Panel -->
+                <div id="departmentsPanel" class="bg-white rounded-2xl shadow-lg p-6" style="display:none;">
+                    <h3 class="font-bold text-gray-800 mb-3">
+                        <i class="fas fa-hospital mr-2 text-teal-600"></i> Departments
+                    </h3>
+                    <div id="departmentsList" class="space-y-2 text-sm"></div>
+                </div>
+
+                <!-- System Info -->
+                <div class="bg-white rounded-2xl shadow-lg p-6 mt-4">
+                    <h3 class="font-bold text-gray-800 mb-3">
+                        <i class="fas fa-info-circle mr-2 text-gray-400"></i> System Info
+                    </h3>
+                    <div class="text-sm text-gray-500 space-y-2">
+                        <p><strong>Hospital:</strong> {{ hospital_name }}</p>
+                        <p><strong>Software:</strong> Deaf AI Healthcare v1.0</p>
+                        <p><strong>Features:</strong></p>
+                        <ul class="list-disc list-inside text-xs mt-1 space-y-1">
+                            <li>Hand gesture detection (wave to start)</li>
+                            <li>AI-powered medical triage</li>
+                            <li>South African Sign Language avatar</li>
+                            <li>Real-time sign language translation</li>
+                            <li>QR code navigation & prescriptions</li>
+                            <li>Speech-to-text & text-to-speech</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ─── State ───
+    let allPatients = [];
+    let grouped = { waiting: [], in_consultation: [], completed: [] };
+    let activeTab = 'waiting';
+    let autoRefreshInterval = null;
+
+    // ─── Clock ───
+    function updateClock() {
+        document.getElementById('dashClock').textContent = new Date().toLocaleTimeString();
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // ─── Tab switching ───
+    function switchTab(tab) {
+        activeTab = tab;
+        // Update tab styles
+        ['waiting', 'in_consultation', 'completed'].forEach(t => {
+            const tabEl = document.getElementById(t === 'waiting' ? 'tabWaiting' : t === 'in_consultation' ? 'tabConsultation' : 'tabCompleted');
+            const colors = t === 'waiting' ? ['amber', 'amber'] : t === 'in_consultation' ? ['blue', 'blue'] : ['green', 'green'];
+            if (t === tab) {
+                tabEl.className = `flex-1 py-3 text-sm font-semibold text-center border-b-2 border-${colors[0]}-500 text-${colors[1]}-700 bg-${colors[0]}-50 transition`;
+            } else {
+                tabEl.className = 'flex-1 py-3 text-sm font-semibold text-center border-b-2 border-transparent text-gray-500 hover:bg-gray-50 transition';
+            }
+        });
+        renderPatientQueue();
+    }
+
+    // ─── Load All Patients ───
+    async function refreshPatients() {
+        const icon = document.getElementById('refreshIcon');
+        icon.classList.add('refresh-spin');
+
+        try {
+            const resp = await fetch('/api/patients/all');
+            const data = await resp.json();
+            allPatients = data.patients;
+            grouped = data.grouped;
+            renderPatientQueue();
+            updateStats();
+        } catch(e) {
+            console.error('Failed to fetch patients:', e);
+        }
+
+        setTimeout(() => icon.classList.remove('refresh-spin'), 1000);
+    }
+
+    function renderPatientQueue() {
+        const queue = document.getElementById('patientQueue');
+        const patients = grouped[activeTab] || [];
+
+        // Update tab counts
+        document.getElementById('tabWaitingCount').textContent = (grouped.waiting || []).length;
+        document.getElementById('tabConsultCount').textContent = (grouped.in_consultation || []).length;
+        document.getElementById('tabCompletedCount').textContent = (grouped.completed || []).length;
+
+        if (patients.length === 0) {
+            const labels = {
+                waiting: 'No patients waiting',
+                in_consultation: 'No patients in consultation',
+                completed: 'No completed consultations yet'
+            };
+            queue.innerHTML = `
+                <div class="text-center py-12 text-gray-400">
+                    <i class="fas fa-inbox text-5xl mb-3"></i>
+                    <p>${labels[activeTab]}</p>
+                </div>`;
+            return;
+        }
+
+        queue.innerHTML = patients.map(p => {
+            const statusColors = {
+                waiting: 'bg-amber-100 text-amber-800',
+                in_consultation: 'bg-blue-100 text-blue-800',
+                completed: 'bg-green-100 text-green-800'
+            };
+            const statusLabel = p.status.replace('_', ' ');
+            const badgeClass = statusColors[p.status] || 'bg-gray-100 text-gray-800';
+
+            let actions = '';
+            if (p.status === 'waiting') {
+                actions = `
+                    <button onclick="receivePatient(${p.id})"
+                            class="btn-primary text-sm whitespace-nowrap">
+                        <i class="fas fa-hand-holding-medical mr-1"></i> Receive
+                    </button>`;
+            } else if (p.status === 'in_consultation') {
+                actions = `
+                    <a href="/translator/${p.id}"
+                       class="btn-primary text-sm text-center whitespace-nowrap inline-block">
+                        <i class="fas fa-language mr-1"></i> Translator
+                    </a>
+                    <button onclick="completePatient(${p.id})"
+                            class="btn-outline text-sm whitespace-nowrap mt-1" style="border-color:#22C55E;color:#22C55E;">
+                        <i class="fas fa-check mr-1"></i> Complete
+                    </button>`;
+            } else {
+                actions = `
+                    <span class="text-green-600 text-sm font-semibold"><i class="fas fa-check-circle mr-1"></i> Done</span>`;
+            }
+
+            return `
+                <div class="patient-card">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-3 mb-2">
+                                <h3 class="font-bold text-lg">${escapeHtml(p.name)}</h3>
+                                <span class="${badgeClass} px-2 py-1 rounded-full text-xs font-semibold">${statusLabel}</span>
+                                <span class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full font-mono">
+                                    ${escapeHtml(p.receipt_number)}
+                                </span>
+                            </div>
+                            <div class="text-sm text-gray-500 space-y-1">
+                                <p><i class="fas fa-hospital-alt mr-1 text-teal-500"></i>
+                                   <strong>${escapeHtml(p.department_name || 'General')}</strong> - ${escapeHtml(p.department_location || '')}</p>
+                                <p><i class="fas fa-user-md mr-1 text-blue-500"></i>
+                                   ${escapeHtml(p.staff_name || 'Unassigned')} ${p.staff_title ? '(' + escapeHtml(p.staff_title) + ')' : ''}</p>
+                                <p><i class="fas fa-comment-medical mr-1 text-amber-500"></i>
+                                   ${escapeHtml(p.triage_summary || 'No triage data')}</p>
+                                <p><i class="fas fa-hands mr-1 text-purple-500"></i>
+                                   Communication: ${escapeHtml(p.communication_pref || 'sign')}</p>
+                                <p><i class="fas fa-clock mr-1 text-gray-400"></i>
+                                   Arrived: ${new Date(p.created_at).toLocaleTimeString()}</p>
+                            </div>
+                        </div>
+                        <div class="flex flex-col gap-2 ml-4">
+                            ${actions}
+                        </div>
+                    </div>
+                </div>`;
+        }).join('');
+    }
+
+    function updateStats() {
+        document.getElementById('statWaiting').textContent = (grouped.waiting || []).length;
+        document.getElementById('statActive').textContent = (grouped.in_consultation || []).length;
+        document.getElementById('statDone').textContent = (grouped.completed || []).length;
+    }
+
+    // ─── Receive Patient ───
+    async function receivePatient(patientId) {
+        try {
+            const resp = await fetch(`/api/patients/${patientId}/receive`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+            const data = await resp.json();
+
+            if (data.patient) {
+                window.location.href = `/translator/${patientId}`;
+            }
+        } catch(e) {
+            console.error('Failed to receive patient:', e);
+            alert('Failed to receive patient. Please try again.');
+        }
+    }
+
+    // ─── Complete Patient ───
+    async function completePatient(patientId) {
+        try {
+            await fetch(`/api/patients/${patientId}/complete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            refreshPatients();
+        } catch(e) {
+            console.error('Failed to complete patient:', e);
+        }
+    }
+
+    // ─── Departments ───
+    async function showDepartments() {
+        const panel = document.getElementById('departmentsPanel');
+        if (panel.style.display === 'none') {
+            panel.style.display = 'block';
+            try {
+                const resp = await fetch('/api/departments');
+                const data = await resp.json();
+                document.getElementById('departmentsList').innerHTML = data.departments.map(d => `
+                    <div class="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg">
+                        <div>
+                            <p class="font-medium text-gray-700">${escapeHtml(d.name)}</p>
+                            <p class="text-xs text-gray-400">${escapeHtml(d.location)}</p>
+                        </div>
+                        <span class="text-xs bg-teal-100 text-teal-700 px-2 py-1 rounded">Floor ${d.floor}</span>
+                    </div>
+                `).join('');
+            } catch(e) {
+                console.error(e);
+            }
+        } else {
+            panel.style.display = 'none';
+        }
+    }
+
+    // ─── Utilities ───
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // ─── Auto-refresh ───
+    document.addEventListener('DOMContentLoaded', () => {
+        refreshPatients();
+        autoRefreshInterval = setInterval(refreshPatients, 15000);
+    });
+    </script>
+</body>
+</html>
