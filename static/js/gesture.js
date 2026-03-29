@@ -28,10 +28,10 @@ class GestureDetector {
 
         // Confidence accumulation
         this.gestureBuffer = [];
-        this.requiredConfirmations = 3; // Need 3 same detections in a row
+        this.requiredConfirmations = 2; // Need 2 same detections in a row
 
         // Cooldown
-        this.gestureCooldown = 3500; // 3.5 seconds
+        this.gestureCooldown = 2000; // 2 seconds
         this.isCoolingDown = false;
     }
 
@@ -181,16 +181,17 @@ class GestureDetector {
         if (fingers.thumb && fingers.index && fingers.middle && fingers.ring && fingers.pinky) {
             if (this.lastWristX !== null) {
                 const dx = wrist.x - this.lastWristX;
-                if (Math.abs(dx) > 0.02) {
+                if (Math.abs(dx) > 0.012) {
                     this.waveHistory.push(dx > 0 ? 'R' : 'L');
-                    if (this.waveHistory.length > 12) this.waveHistory.shift();
+                    if (this.waveHistory.length > 20) this.waveHistory.shift();
 
                     let changes = 0;
                     for (let i = 1; i < this.waveHistory.length; i++) {
                         if (this.waveHistory[i] !== this.waveHistory[i - 1]) changes++;
                     }
-                    if (changes >= 4) {
+                    if (changes >= 2) {
                         this.waveHistory = [];
+                        this.lastWristX = null;
                         return 'wave';
                     }
                 }

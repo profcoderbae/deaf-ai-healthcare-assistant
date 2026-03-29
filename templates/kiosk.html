@@ -282,8 +282,9 @@
     // ─── Gesture Handler ───
     function onGestureDetected(gesture) {
         const indicator = document.getElementById('gestureIndicator');
-        if (gesture === 'wave') {
-            indicator.textContent = '👋 Wave Detected!';
+        // Accept wave OR open_palm (held open hand = hello) as the start gesture
+        if (gesture === 'wave' || gesture === 'open_palm') {
+            indicator.textContent = gesture === 'wave' ? '👋 Wave Detected!' : '✋ Hello Detected!';
             indicator.classList.add('active');
             setTimeout(() => indicator.classList.remove('active'), 2000);
 
@@ -392,15 +393,10 @@
                         setTimeout(() => indicator.classList.remove('active'), 2000);
 
                         // Map detected words to triage option selection
-                        if (currentStep && currentStep.options) {
+                        if (currentStep && currentStep.options && currentStep.options.length > 0) {
                             const detected = result.value.toLowerCase();
-                            if (detected === 'yes' || detected === 'thumbs up') {
-                                const opt = currentStep.options.find(o => /yes|okay|ok/i.test(o.label));
-                                if (opt) selectOption(opt);
-                            } else if (detected === 'no') {
-                                const opt = currentStep.options.find(o => /no|not/i.test(o.label));
-                                if (opt) selectOption(opt);
-                            }
+                            const gesture = (result.gesture || '').toLowerCase();
+                            handleSignTriageSelection(detected, gesture);
                         }
                     } else if (result.type === 'status') {
                         if (result.status === 'collecting') {
@@ -434,9 +430,14 @@
                     document.getElementById('signGestureInd').classList.add('active');
                     document.getElementById('gestureLabel').textContent = label;
                     setTimeout(() => document.getElementById('signGestureInd').classList.remove('active'), 2000);
-                    if (gesture === 'thumbs_up' && currentStep) {
-                        const options = currentStep.options;
-                        if (options && options.length > 0) selectOption(options[0]);
+                    // Use shared sign-triage handler
+                    if (currentStep && currentStep.options && currentStep.options.length > 0) {
+                        const gestureWordMap = {
+                            'thumbs_up': 'yes', 'fist': 'no', 'open_palm': 'hello',
+                            'peace': 'thank you', 'ok_sign': 'ok', 'pointing': 'there'
+                        };
+                        const detected = gestureWordMap[gesture] || gesture;
+                        handleSignTriageSelection(detected, gesture);
                     }
                 });
                 await signDetector.start();
@@ -461,6 +462,65 @@
         document.getElementById('kioskDetectionValue').textContent = '—';
         document.getElementById('kioskDetectionConf').textContent = '';
         document.getElementById('kioskDetectionSentence').textContent = '';
+    }
+
+    // ─── Sign Language → Triage Option Mapping ───
+    // Cooldown to prevent rapid-fire option selection
+    let lastSignSelectionTime = 0;
+    const SIGN_SELECTION_COOLDOWN = 3000; // 3s between sign-based selections
+
+    function handleSignTriageSelection(detected, gesture) {
+        if (!currentStep || !currentStep.options || currentStep.options.length === 0) return;
+
+        const now = Date.now();
+        if (now - lastSignSelectionTime < SIGN_SELECTION_COOLDOWN) return;
+
+        const opts = currentStep.options;
+        let selectedOpt = null;
+
+        // YES gestures: thumbs up → find Yes/OK/Familiar option
+        if (detected === 'yes' || detected === 'ok' || gesture === 'thumbs_up' || gesture === 'ok_sign') {
+            selectedOpt = opts.find(o => /yes|okay|ok|✅|familiar|no known|no medication/i.test(o.label));
+            // If no explicit yes, select first option as affirmative
+            if (!selectedOpt && opts.length === 2) selectedOpt = opts[0];
+        }
+        // NO gestures: fist / head shake → find No/Not option
+        else if (detected === 'no' || detected === 'feeling bad' || gesture === 'fist') {
+            selectedOpt = opts.find(o => /no[, ]|not |❌|don't/i.test(o.label));
+            // If no explicit no, select second option as negative (for 2-option steps)
+            if (!selectedOpt && opts.length === 2) selectedOpt = opts[1];
+        }
+        // HELLO gesture → wave detected during triage means greeting acknowledged
+        else if (detected === 'hello' || gesture === 'open_palm' || gesture === 'wave') {
+            // If on greeting step, select first option (General Checkup)
+            if (currentStep.id === 'greeting') {
+                selectedOpt = opts[0];
+            }
+        }
+        // POINTING → select "Other" or fallback
+        else if (detected === 'there' || gesture === 'pointing') {
+            selectedOpt = opts.find(o => /other|describe/i.test(o.label));
+        }
+        // HELP gesture (horns) → select Emergency/Urgent
+        else if (detected === 'help' || gesture === 'horns') {
+            selectedOpt = opts.find(o => /urgent|emergency|🚨/i.test(o.label));
+        }
+        // PAIN gesture (pinch) → select Pain/Injury
+        else if (detected === 'pain' || gesture === 'pinch') {
+            selectedOpt = opts.find(o => /pain|injury|🤕/i.test(o.label));
+        }
+
+        if (selectedOpt) {
+            lastSignSelectionTime = now;
+            // Visual feedback before selecting
+            const indicator = document.getElementById('signGestureInd');
+            indicator.textContent = `✅ Selected: ${selectedOpt.label}`;
+            indicator.classList.add('active');
+            setTimeout(() => {
+                indicator.classList.remove('active');
+                selectOption(selectedOpt);
+            }, 800);
+        }
     }
 
     // ─── Triage Flow ───

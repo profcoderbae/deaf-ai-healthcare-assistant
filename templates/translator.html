@@ -242,7 +242,14 @@
                     <button onclick="speakLastPatientMessage()" class="btn-outline text-xs py-2">
                         <i class="fas fa-volume-up mr-1"></i> Replay Last
                     </button>
-                    <span class="text-xs text-gray-400">Audio plays when messages are sent</span>
+                    <label class="flex items-center gap-1 cursor-pointer">
+                        <input type="checkbox" id="autoSpeakToggle" checked onchange="toggleAutoSpeak()"
+                               class="w-4 h-4 accent-teal-600">
+                        <span class="text-xs text-gray-500">Auto-read patient signs aloud</span>
+                    </label>
+                    <span id="speakingIndicator" class="text-xs text-teal-600 font-semibold" style="display:none;">
+                        <i class="fas fa-volume-up"></i> Speaking...
+                    </span>
                 </div>
             </div>
 
@@ -391,6 +398,7 @@
     let doctorMessages = [];
     let isSpeaking = false;
     let speechQueue = [];
+    let autoSpeakPatient = true;
 
     // ─── Sentence Builder State ───
     let sentenceWords = [];
@@ -915,7 +923,7 @@
         ).join('');
         container.scrollTop = container.scrollHeight;
         addTranscriptEntry('patient', message);
-        queueSpeak(message);
+        if (autoSpeakPatient) queueSpeak(message);
 
         if (consultationId) {
             fetch(`/api/consultation/${consultationId}/message`, {
@@ -928,6 +936,10 @@
 
     function speakLastPatientMessage() {
         if (lastPatientMessage) queueSpeak(lastPatientMessage);
+    }
+
+    function toggleAutoSpeak() {
+        autoSpeakPatient = document.getElementById('autoSpeakToggle').checked;
     }
 
     // ─── Doctor Speech Recognition ───
@@ -1094,8 +1106,10 @@
     }
 
     function processQueue() {
-        if (speechQueue.length === 0) { isSpeaking = false; return; }
+        const indicator = document.getElementById('speakingIndicator');
+        if (speechQueue.length === 0) { isSpeaking = false; if (indicator) indicator.style.display = 'none'; return; }
         isSpeaking = true;
+        if (indicator) indicator.style.display = 'inline';
         const text = speechQueue.shift();
         if ('speechSynthesis' in window) {
             speechSynthesis.cancel();
