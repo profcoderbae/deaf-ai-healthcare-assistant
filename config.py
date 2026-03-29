@@ -2,7 +2,8 @@ import os
 
 # Flask
 SECRET_KEY = os.environ.get('SECRET_KEY', 'deaf-ai-hackathon-2026')
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'false').lower() in ('true', '1', 'yes')
+PORT = int(os.environ.get('PORT', 5000))
 
 # AI Provider: 'groq', 'openai', or 'demo' (no API key needed)
 AI_PROVIDER = os.environ.get('AI_PROVIDER', 'groq')

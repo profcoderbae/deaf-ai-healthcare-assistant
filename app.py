@@ -1,10 +1,16 @@
+import os
+
+# Eventlet monkey-patch for production (Render sets RENDER=true)
+if os.environ.get('RENDER'):
+    import eventlet
+    eventlet.monkey_patch()
+
 from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 import json
 import base64
 import time
-import os
 import config
 from database import (
     init_db, get_db, create_patient, match_department, get_waiting_patients,
@@ -21,7 +27,8 @@ from services.sign_detector import SignDetector, GESTURE_TO_WORD, get_word_for_g
 app = Flask(__name__)
 app.secret_key = config.SECRET_KEY
 CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+async_mode = 'eventlet' if os.environ.get('RENDER') else 'threading'
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode=async_mode)
 
 chatbot = HealthcareChatbot()
 sign_detector = SignDetector()
@@ -557,4 +564,5 @@ if __name__ == '__main__':
     print(f"  🔄 Translator (Part 2): Opens from staff dashboard")
     print(f"  🤟 Sign Detection:    WebSocket on /socket.io/")
     print(f"\n{'='*60}\n")
-    socketio.run(app, debug=config.DEBUG, host='0.0.0.0', port=5000)
+    port = config.PORT
+    socketio.run(app, debug=config.DEBUG, host='0.0.0.0', port=port)
