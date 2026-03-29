@@ -1,14 +1,11 @@
 services:
   - type: web
     name: deaf-ai-healthcare
-    runtime: python
+    runtime: docker
     repo: https://github.com/profcoderbae/deaf-ai-healthcare-assistant.git
     branch: master
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:$PORT app:app
+    dockerfilePath: ./Dockerfile
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.9
       - key: GROQ_API_KEY
         sync: false
       - key: AI_PROVIDER
@@ -17,3 +14,5 @@ services:
         generateValue: true
       - key: HOSPITAL_NAME
         value: Tygerberg Hospital
+      - key: RENDER
+        value: "true"

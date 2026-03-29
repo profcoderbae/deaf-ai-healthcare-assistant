@@ -67,31 +67,40 @@ class SignDetector:
     """
 
     def __init__(self):
-        # Download both models
-        _ensure_model(_HAND_MODEL_PATH, _HAND_MODEL_URL, 'hand landmarker model')
-        _ensure_model(_GESTURE_MODEL_PATH, _GESTURE_MODEL_URL, 'gesture recognizer model (Google ML)')
+        self.detector = None
+        self.gesture_recognizer = None
+        self.available = False
 
-        # Init HandLandmarker (for landmarks + custom gestures)
-        hand_options = mp_vision.HandLandmarkerOptions(
-            base_options=mp_python.BaseOptions(model_asset_path=_HAND_MODEL_PATH),
-            num_hands=1,
-            min_hand_detection_confidence=0.5,
-            min_hand_presence_confidence=0.5,
-            min_tracking_confidence=0.5,
-        )
-        self.detector = mp_vision.HandLandmarker.create_from_options(hand_options)
+        try:
+            # Download both models
+            _ensure_model(_HAND_MODEL_PATH, _HAND_MODEL_URL, 'hand landmarker model')
+            _ensure_model(_GESTURE_MODEL_PATH, _GESTURE_MODEL_URL, 'gesture recognizer model (Google ML)')
 
-        # Init GestureRecognizer (Google's pre-trained ML model)
-        gesture_options = mp_vision.GestureRecognizerOptions(
-            base_options=mp_python.BaseOptions(model_asset_path=_GESTURE_MODEL_PATH),
-            num_hands=1,
-            min_hand_detection_confidence=0.5,
-            min_hand_presence_confidence=0.5,
-            min_tracking_confidence=0.5,
-        )
-        self.gesture_recognizer = mp_vision.GestureRecognizer.create_from_options(gesture_options)
+            # Init HandLandmarker (for landmarks + custom gestures)
+            hand_options = mp_vision.HandLandmarkerOptions(
+                base_options=mp_python.BaseOptions(model_asset_path=_HAND_MODEL_PATH),
+                num_hands=1,
+                min_hand_detection_confidence=0.5,
+                min_hand_presence_confidence=0.5,
+                min_tracking_confidence=0.5,
+            )
+            self.detector = mp_vision.HandLandmarker.create_from_options(hand_options)
 
-        print('[SignDetector] ML GestureRecognizer loaded (Open_Palm, Closed_Fist, Thumb_Up, Thumb_Down, Victory, ILoveYou, Pointing_Up)')
+            # Init GestureRecognizer (Google's pre-trained ML model)
+            gesture_options = mp_vision.GestureRecognizerOptions(
+                base_options=mp_python.BaseOptions(model_asset_path=_GESTURE_MODEL_PATH),
+                num_hands=1,
+                min_hand_detection_confidence=0.5,
+                min_hand_presence_confidence=0.5,
+                min_tracking_confidence=0.5,
+            )
+            self.gesture_recognizer = mp_vision.GestureRecognizer.create_from_options(gesture_options)
+
+            self.available = True
+            print('[SignDetector] ML GestureRecognizer loaded (Open_Palm, Closed_Fist, Thumb_Up, Thumb_Down, Victory, ILoveYou, Pointing_Up)')
+        except Exception as e:
+            print(f'[SignDetector] WARNING: Could not initialize MediaPipe: {e}')
+            print('[SignDetector] Sign detection will be unavailable. Chatbot features still work.')
 
         # Motion buffer for word-level detection
         self.frame_buffer = deque(maxlen=30)
@@ -103,6 +112,9 @@ class SignDetector:
         Process a single camera frame.
         Returns hand landmarks as normalized (x,y) pairs, or None.
         """
+        if not self.available:
+            return None
+
         nparr = np.frombuffer(image_bytes, np.uint8)
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         if image is None:
@@ -134,6 +146,9 @@ class SignDetector:
         to classify hand gestures. Much more accurate than rule-based.
         Returns (gesture_name, confidence) or (None, 0).
         """
+        if not self.available:
+            return None, 0.0
+
         nparr = np.frombuffer(image_bytes, np.uint8)
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         if image is None:
