@@ -67,8 +67,8 @@ class GestureDetector {
                 if (this.frameCount % (this.frameSkip + 1) !== 0) return;
                 await this.hands.send({ image: this.videoElement });
             },
-            width: 640,
-            height: 480,
+            width: 1280,
+            height: 720,
         });
 
         await this.camera.start();

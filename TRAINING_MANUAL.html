@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign Language Communication Training Manual — Tygerberg Hospital</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', sans-serif; color: #1a1a2e; background: #f0f4f8; line-height: 1.6; }
+  .container { max-width: 960px; margin: 0 auto; padding: 20px; }
+
+  /* Cover */
+  .cover { background: linear-gradient(135deg, #0d9488, #0891b2); color: white; padding: 60px 40px; border-radius: 16px; text-align: center; margin-bottom: 40px; }
+  .cover h1 { font-size: 2.4em; font-weight: 700; margin-bottom: 8px; }
+  .cover h2 { font-size: 1.2em; font-weight: 400; opacity: 0.9; }
+  .cover .badge { display: inline-block; background: rgba(255,255,255,0.2); padding: 6px 16px; border-radius: 20px; margin-top: 16px; font-size: 0.9em; }
+
+  /* TOC */
+  .toc { background: white; border-radius: 12px; padding: 30px; margin-bottom: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .toc h2 { margin-bottom: 16px; color: #0d9488; }
+  .toc ol { padding-left: 24px; }
+  .toc li { padding: 4px 0; }
+  .toc a { color: #0891b2; text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+
+  /* Sections */
+  .section { background: white; border-radius: 12px; padding: 30px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .section h2 { color: #0d9488; font-size: 1.5em; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0; }
+  .section h3 { color: #334155; font-size: 1.15em; margin: 20px 0 10px; }
+  .section p { margin-bottom: 12px; color: #475569; }
+
+  /* Gesture table */
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+  th { background: #0d9488; color: white; padding: 10px 14px; text-align: left; font-weight: 600; font-size: 0.9em; }
+  td { padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-size: 0.92em; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .gesture-emoji { font-size: 1.5em; text-align: center; }
+  .ml-badge { display: inline-block; background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 10px; font-size: 0.75em; font-weight: 600; }
+  .geo-badge { display: inline-block; background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 10px; font-size: 0.75em; font-weight: 600; }
+
+  /* Tips */
+  .tip { background: #f0fdfa; border-left: 4px solid #0d9488; padding: 14px 18px; border-radius: 0 8px 8px 0; margin: 16px 0; }
+  .tip strong { color: #0d9488; }
+  .warning { background: #fef2f2; border-left: 4px solid #ef4444; padding: 14px 18px; border-radius: 0 8px 8px 0; margin: 16px 0; }
+  .warning strong { color: #ef4444; }
+
+  /* Dept card */
+  .dept-card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; margin: 16px 0; }
+  .dept-card h3 { color: #0d9488; margin-top: 0; }
+  .dept-card .quick-phrase { display: inline-block; background: #f1f5f9; border-radius: 8px; padding: 4px 12px; margin: 3px; font-size: 0.85em; }
+
+  /* Steps */
+  .step { display: flex; gap: 16px; margin: 14px 0; align-items: flex-start; }
+  .step-num { background: #0d9488; color: white; min-width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9em; }
+  .step-content { flex: 1; }
+
+  /* Print */
+  @media print {
+    body { background: white; }
+    .section, .toc, .cover { box-shadow: none; break-inside: avoid; }
+    .cover { background: #0d9488 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- Cover -->
+<div class="cover">
+  <h1>🤟 Sign Language Communication</h1>
+  <h2>Training Manual for Healthcare Staff & Patients</h2>
+  <div class="badge">Tygerberg Hospital — Deaf AI Healthcare Assistant</div>
+  <p style="margin-top: 20px; opacity: 0.85;">Version 2.0 · Powered by Google MediaPipe ML + Custom Medical Gestures</p>
+</div>
+
+<!-- Table of Contents -->
+<div class="toc" id="toc">
+  <h2>📋 Table of Contents</h2>
+  <ol>
+    <li><a href="#overview">System Overview</a></li>
+    <li><a href="#howit">How the System Detects Signs</a></li>
+    <li><a href="#core">Standard SASL Gestures (Universal)</a></li>
+    <li><a href="#technique">Technique: How to Sign Clearly</a></li>
+    <li><a href="#phrases">Quick Phrase Boards by Department</a></li>
+    <li><a href="#sentences">Building Sentences</a></li>
+    <li><a href="#modes">Detection Modes: Words, Letters, Numbers</a></li>
+    <li><a href="#troubleshoot">Troubleshooting</a></li>
+    <li><a href="#practice">Practice Exercises</a></li>
+  </ol>
+</div>
+
+<!-- 1. Overview -->
+<div class="section" id="overview">
+  <h2>1. System Overview</h2>
+  <p>The Deaf AI Healthcare Assistant translates hand gestures into medical words in real-time using your camera. It uses <strong>two AI models together</strong>:</p>
+  <table>
+    <tr><th>Model</th><th>Type</th><th>What It Detects</th><th>Accuracy</th></tr>
+    <tr>
+      <td><strong>Google GestureRecognizer</strong> <span class="ml-badge">ML MODEL</span></td>
+      <td>Pre-trained neural network</td>
+      <td>7 core gestures: Open Palm, Fist, Thumbs Up, Thumbs Down, Peace/Victory, Pointing Up, ILY</td>
+      <td>High</td>
+    </tr>
+    <tr>
+      <td><strong>Custom Geometric Classifier</strong> <span class="geo-badge">RULE-BASED</span></td>
+      <td>Finger angle analysis</td>
+      <td>8 extra medical gestures: Pinch, OK Sign, Horns, Call Me, Three Up, L-Shape, Palm Down, Four Up</td>
+      <td>Good</td>
+    </tr>
+  </table>
+  <p>The ML model runs <strong>first</strong> as the primary detector. The geometric classifier adds extra medical gesture support that the ML model doesn't cover.</p>
+</div>
+
+<!-- 2. How It Works -->
+<div class="section" id="howit">
+  <h2>2. How the System Detects Signs</h2>
+
+  <h3>Detection Pipeline</h3>
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-content"><strong>Camera captures your hand</strong> — Keep your hand clearly visible, well-lit</div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-content"><strong>ML model checks for gesture</strong> — Google's neural network analyzes the image</div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-content"><strong>Geometric classifier runs</strong> — Checks for additional medical gestures the ML model doesn't know</div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-content"><strong>Stability check</strong> — You must hold the gesture steady for ~0.4 seconds (2 frames) before it registers</div>
+  </div>
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-content"><strong>Word appears on screen</strong> — The gesture is translated to a standard SASL medical word (same in every department)</div>
+  </div>
+
+  <div class="tip">
+    <strong>💡 Anti-Repetition:</strong> The same word will NOT repeat. To say the same word again, you must first make a <em>different</em> gesture, or put your hand down and raise it again. A word cannot re-appear within 5 seconds.
+  </div>
+</div>
+
+<!-- 3. Core Gestures -->
+<div class="section" id="core">
+  <h2>3. Standard SASL Gestures (Universal)</h2>
+  <p>These 15 gestures work the <strong>same in every department</strong>. Each gesture always means the same word — following South African Sign Language (SASL) conventions. No confusion, no department-specific overrides.</p>
+
+  <h3>🤖 ML-Detected Gestures (Primary — High Accuracy)</h3>
+  <table>
+    <tr><th></th><th>Gesture</th><th>How to Form It</th><th>Standard Word</th></tr>
+    <tr>
+      <td class="gesture-emoji">🖐️</td>
+      <td><strong>Open Palm</strong> <span class="ml-badge">ML</span></td>
+      <td>All 5 fingers extended, palm facing camera, fingers spread apart</td>
+      <td>Hello</td>
+    </tr>
+    <tr>
+      <td class="gesture-emoji">✊</td>
+      <td><strong>Closed Fist</strong> <span class="ml-badge">ML</span></td>
+      <td>All fingers curled tight into palm, thumb wrapped over fingers</td>
+      <td>No</td>
+    </tr>
+    <tr>
+      <td class="gesture-emoji">👍</td>
+      <td><strong>Thumbs Up</strong> <span class="ml-badge">ML</span></td>
+      <td>Fist with thumb pointing straight up</td>
+      <td>Yes</td>
+    </tr>
+    <tr>
+      <td class="gesture-emoji">👎</td>
+      <td><strong>Thumbs Down</strong> <span class="ml-badge">ML</span></td>
+      <td>Fist with thumb pointing straight down</td>
+      <td>Feeling bad</td>
+    </tr>
+    <tr>
+      <td class="gesture-emoji">✌️</td>
+      <td><strong>Victory / Peace</strong> <span class="ml-badge">ML</span></td>
+      <td>Index and middle fingers raised in a V, other fingers curled</td>
+      <td>Thank you</td>
+    </tr>
+    <tr>
+      <td class="gesture-emoji">☝️</td>
+      <td><strong>Pointing Up</strong> <span class="ml-badge">ML</span></td>
+      <td>Index finger extended straight up, all other fingers curled</td>
+      <td>There</td>
+    </tr>
+    <tr>
+      <td class="gesture-emoji">🤟</td>
+      <td><strong>I Love You (ILY)</strong> <span class="ml-badge">ML</span></td>
+      <td>Thumb, index finger, and pinky extended; middle and ring curled</td>
+      <td>I love you</td>
+    </tr>
+  </table>
+
+  <h3>🔬 Geometric-Detected Gestures (Additional Medical)</h3>
+  <table>
+    <tr><th></th><th>Gesture</th><th>How to Form It</th><th>Standard Word</th></tr>
+    <tr>
+      <td class="gesture-emoji">🤏</td>
+      <td><strong>Pinch</strong> <span class="geo-badge">GEO</span></td>
+      <td>Thumb and index finger touching tips, other fingers relaxed/open</td>
+      <td>Pain</td>
+    </tr>
+    <tr>
+      <td class="gesture-emoji">👌</td>
+      <td><strong>OK Sign</strong> <span class="geo-badge">GEO</span></td>
+      <td>Thumb and index form a circle, other 3 fingers extended straight</td>
+      <td>OK</td>
+    </tr>
+    <tr>
+      <td class="gesture-emoji">🤘</td>
+      <td><strong>Horns</strong> <span class="geo-badge">GEO</span></td>
+      <td>Index and pinky extended, middle and ring curled, thumb curled</td>
+      <td>Help</td>
+    </tr>
+    <tr>
+      <td class="gesture-emoji">🤙</td>
+      <td><strong>Call Me</strong> <span class="geo-badge">GEO</span></td>
+      <td>Thumb and pinky extended, other 3 fingers curled into palm</td>
+      <td>Call</td>
+    </tr>
+    <tr>
+      <td class="gesture-emoji">🤟</td>
+      <td><strong>Three Up</strong> <span class="geo-badge">GEO</span></td>
+      <td>Index, middle, and ring fingers raised; pinky and thumb curled</td>
+      <td>Medicine</td>
+    </tr>
+    <tr>
+      <td class="gesture-emoji">👆</td>
+      <td><strong>L-Shape (Thumb+Index)</strong> <span class="geo-badge">GEO</span></td>
+      <td>Thumb and index extended at an L-angle, other 3 fingers curled</td>
+      <td>Need</td>
+    </tr>
+    <tr>
+      <td class="gesture-emoji">🖐️</td>
+      <td><strong>Palm Down (Flat)</strong> <span class="geo-badge">GEO</span></td>
+      <td>All fingers extended, palm facing <em>downward</em> (flat horizontal)</td>
+      <td>Please wait</td>
+    </tr>
+    <tr>
+      <td class="gesture-emoji">✋</td>
+      <td><strong>Four Up</strong> <span class="geo-badge">GEO</span></td>
+      <td>Index, middle, ring, and pinky raised; thumb curled across palm</td>
+      <td>Wait</td>
+    </tr>
+  </table>
+</div>
+
+<!-- 4. Technique -->
+<div class="section" id="technique">
+  <h2>4. Technique: How to Sign Clearly</h2>
+
+  <h3>✅ DO</h3>
+  <table>
+    <tr><td style="width:40px">🎯</td><td><strong>Hold each gesture for at least 1 second</strong> — the system needs 2 consecutive frames (~0.4s) to register</td></tr>
+    <tr><td>💡</td><td><strong>Use good lighting</strong> — face a window or lamp; avoid backlight behind your hand</td></tr>
+    <tr><td>📏</td><td><strong>Keep hand 30–60 cm from camera</strong> — not too close, not too far</td></tr>
+    <tr><td>🖐️</td><td><strong>Exaggerate finger positions</strong> — spread fingers wide for open palm; curl tightly for fist</td></tr>
+    <tr><td>⏸️</td><td><strong>Pause between gestures</strong> — drop hand briefly or make a neutral position between words</td></tr>
+    <tr><td>🎨</td><td><strong>Plain background</strong> — avoid busy patterns behind your hand</td></tr>
+  </table>
+
+  <h3>❌ DON'T</h3>
+  <table>
+    <tr><td style="width:40px">🚫</td><td><strong>Don't switch gestures too quickly</strong> — transitioning fast causes false detections</td></tr>
+    <tr><td>🚫</td><td><strong>Don't wave your hand around</strong> — keep it steady while holding a gesture</td></tr>
+    <tr><td>🚫</td><td><strong>Don't show both hands</strong> — the system tracks one hand only</td></tr>
+    <tr><td>🚫</td><td><strong>Don't hold the same gesture expecting repeated words</strong> — each word requires: gesture → pause → gesture</td></tr>
+  </table>
+
+  <div class="warning">
+    <strong>⚠️ To say the same word twice:</strong> Show gesture → put hand down (or make a different gesture) → show original gesture again. Simply holding a gesture will NOT repeat the word.
+  </div>
+</div>
+
+<!-- 5. Universal Gesture Reference -->
+<div class="section" id="depts">
+  <h2>5. Universal Gesture Reference</h2>
+  <p>All gestures follow <strong>South African Sign Language (SASL) standards</strong>. Each gesture always means the <strong>same word</strong>, no matter which department the patient is in. This prevents confusion — a fist always means "No", a pinch always means "Pain", etc.</p>
+
+  <div class="dept-card">
+    <h3>🤟 Complete Gesture → Word Chart (All Departments)</h3>
+    <table>
+      <tr><th>Gesture</th><th>Hand Shape</th><th>Always Means</th><th>Detection</th></tr>
+      <tr><td>🖐️ Open Palm</td><td>All 5 fingers spread open</td><td><strong>Hello</strong></td><td><span class="ml-badge">ML</span></td></tr>
+      <tr><td>👍 Thumbs Up</td><td>Fist with thumb up</td><td><strong>Yes</strong></td><td><span class="ml-badge">ML</span></td></tr>
+      <tr><td>👎 Thumbs Down</td><td>Fist with thumb down</td><td><strong>Feeling bad</strong></td><td><span class="ml-badge">ML</span></td></tr>
+      <tr><td>✊ Fist</td><td>All fingers curled tight</td><td><strong>No</strong></td><td><span class="ml-badge">ML</span></td></tr>
+      <tr><td>✌️ Peace</td><td>Index + middle V-sign</td><td><strong>Thank you</strong></td><td><span class="ml-badge">ML</span></td></tr>
+      <tr><td>☝️ Pointing</td><td>Index finger up</td><td><strong>There</strong></td><td><span class="ml-badge">ML</span></td></tr>
+      <tr><td>🤟 ILY</td><td>Thumb + index + pinky out</td><td><strong>I love you</strong></td><td><span class="ml-badge">ML</span></td></tr>
+      <tr><td>🤏 Pinch</td><td>Thumb + index tips touching</td><td><strong>Pain</strong></td><td><span class="geo-badge">GEO</span></td></tr>
+      <tr><td>👌 OK Sign</td><td>Thumb + index circle, 3 fingers up</td><td><strong>OK</strong></td><td><span class="geo-badge">GEO</span></td></tr>
+      <tr><td>🤘 Horns</td><td>Index + pinky up, others down</td><td><strong>Help</strong></td><td><span class="geo-badge">GEO</span></td></tr>
+      <tr><td>🤙 Call Me</td><td>Thumb + pinky out, others curled</td><td><strong>Call</strong></td><td><span class="geo-badge">GEO</span></td></tr>
+      <tr><td>🤟 Three Up</td><td>Index + middle + ring up</td><td><strong>Medicine</strong></td><td><span class="geo-badge">GEO</span></td></tr>
+      <tr><td>👆 L-Shape</td><td>Thumb + index in L-angle</td><td><strong>Need</strong></td><td><span class="geo-badge">GEO</span></td></tr>
+      <tr><td>🖐️ Palm Down</td><td>All fingers flat, palm facing down</td><td><strong>Please wait</strong></td><td><span class="geo-badge">GEO</span></td></tr>
+      <tr><td>✋ Four Up</td><td>4 fingers up, no thumb</td><td><strong>Wait</strong></td><td><span class="geo-badge">GEO</span></td></tr>
+    </table>
+  </div>
+
+  <div class="tip">
+    <strong>💡 How to communicate specific symptoms:</strong> Use the standard gestures to build sentences, then use the <strong>Quick Phrase Board</strong> (Section 6) for department-specific medical terms. For example: sign "Pain" + "There" (point at chest) + tap "Cannot breathe" quick phrase.
+  </div>
+
+  <div class="dept-card">
+    <h3>📝 Example Conversations Using Standard Gestures</h3>
+
+    <p><strong>Pulmonology visit:</strong></p>
+    <p style="color:#475569">
+      <em>Open Palm</em> → "Hello" → <em>Pinch</em> → "Pain" → <em>Pointing</em> → "There" → <em>Horns</em> → "Help" → tap <strong>"Cannot breathe"</strong> quick phrase
+    </p>
+    <p style="color:#475569">→ Reads: <strong>"Hello. Pain. There. Help. Cannot breathe."</strong></p>
+
+    <p style="margin-top:16px"><strong>Ophthalmology visit:</strong></p>
+    <p style="color:#475569">
+      <em>Open Palm</em> → "Hello" → <em>Pinch</em> → "Pain" → <em>Thumbs Down</em> → "Feeling bad" → tap <strong>"Blurry vision"</strong> + <strong>"Need glasses"</strong> quick phrases
+    </p>
+    <p style="color:#475569">→ Reads: <strong>"Hello. Pain. Feeling bad. Blurry vision. Need glasses."</strong></p>
+
+    <p style="margin-top:16px"><strong>Gastroenterology visit:</strong></p>
+    <p style="color:#475569">
+      <em>Open Palm</em> → "Hello" → <em>Pinch</em> → "Pain" → <em>Fist</em> → "No" → <em>Three Up</em> → "Medicine" → tap <strong>"Vomiting"</strong> quick phrase
+    </p>
+    <p style="color:#475569">→ Reads: <strong>"Hello. Pain. No. Medicine. Vomiting."</strong></p>
+  </div>
+</div>
+
+<!-- 6. Quick Phrases -->
+<div class="section" id="phrases">
+  <h2>6. Quick Phrase Boards</h2>
+  <p>Each department also has a <strong>Quick Phrase Board</strong> — tap-to-send buttons for common sentences. These do NOT require gestures; the patient just taps the phrase on screen.</p>
+
+  <div class="dept-card">
+    <h3>👁️ Ophthalmology Quick Phrases</h3>
+    <span class="quick-phrase">👁️ Eye pain</span>
+    <span class="quick-phrase">😵 Blurry vision</span>
+    <span class="quick-phrase">💧 Eyes watering</span>
+    <span class="quick-phrase">🔴 Eye is red</span>
+    <span class="quick-phrase">👓 Need glasses</span>
+    <span class="quick-phrase">🌟 Sensitive to light</span>
+    <span class="quick-phrase">💊 Need eye drops</span>
+    <span class="quick-phrase">🔍 Cannot see far</span>
+    <span class="quick-phrase">📖 Cannot read</span>
+    <span class="quick-phrase">🤕 Headache from eyes</span>
+    <span class="quick-phrase">✨ Seeing flashes</span>
+    <span class="quick-phrase">⬇️ Vision getting worse</span>
+  </div>
+
+  <div class="tip">
+    <strong>💡 Tip:</strong> Quick phrases are fastest for common complaints. Use gestures for follow-up details and conversation.
+  </div>
+</div>
+
+<!-- 7. Building Sentences -->
+<div class="section" id="sentences">
+  <h2>7. Building Sentences</h2>
+  <p>Words detected from gestures are added to a <strong>sentence builder</strong> on screen. The patient can review and send the complete sentence.</p>
+
+  <h3>Example: Hospital Visit</h3>
+  <table>
+    <tr><th>Step</th><th>Gesture</th><th>Word Added</th><th>Sentence So Far</th></tr>
+    <tr><td>1</td><td>🖐️ Open Palm</td><td>Hello</td><td>Hello</td></tr>
+    <tr><td>2</td><td>🤏 Pinch</td><td>Pain</td><td>Hello Pain</td></tr>
+    <tr><td>3</td><td>☝️ Pointing</td><td>There</td><td>Hello Pain There</td></tr>
+    <tr><td>4</td><td>👎 Thumbs Down</td><td>Feeling bad</td><td>Hello Pain There Feeling bad</td></tr>
+    <tr><td>5</td><td>🤟 Three Up</td><td>Medicine</td><td>Hello Pain There Feeling bad Medicine</td></tr>
+  </table>
+
+  <div class="tip">
+    <strong>💡 Flow:</strong> Sign gestures one at a time → Review sentence on screen → Tap "Send" when complete → Doctor receives the message
+  </div>
+
+  <h3>Editing</h3>
+  <p>If a wrong word appears, tap the ✕ next to it in the sentence builder to remove it before sending.</p>
+</div>
+
+<!-- 8. Detection Modes -->
+<div class="section" id="modes">
+  <h2>8. Detection Modes</h2>
+  <p>The translator supports three modes, switchable via buttons:</p>
+  <table>
+    <tr><th>Mode</th><th>Button</th><th>Use For</th><th>How It Works</th></tr>
+    <tr>
+      <td><strong>Words (Glosses)</strong></td>
+      <td>🤟 Words</td>
+      <td>Main communication — medical phrases</td>
+      <td>Shows gestures → standard SASL words. Uses ML + geometric models.</td>
+    </tr>
+    <tr>
+      <td><strong>Letters</strong></td>
+      <td>🔤 ABC</td>
+      <td>Spelling names, medications, specific words</td>
+      <td>ASL fingerspelling A–Z. Requires holding each letter 0.8s.</td>
+    </tr>
+    <tr>
+      <td><strong>Numbers</strong></td>
+      <td>🔢 123</td>
+      <td>Pain scale (1–10), room numbers, quantities</td>
+      <td>ASL number signs 0–9.</td>
+    </tr>
+  </table>
+
+  <h3>When to Use Each Mode</h3>
+  <ul style="padding-left: 24px; color: #475569;">
+    <li><strong>Start with Words mode</strong> — for symptoms, requests, responses</li>
+    <li><strong>Switch to Letters</strong> — to spell a medication name, doctor's name, or unfamiliar word</li>
+    <li><strong>Switch to Numbers</strong> — when asked "rate your pain 1–10" or for dosages</li>
+  </ul>
+</div>
+
+<!-- 9. Troubleshooting -->
+<div class="section" id="troubleshoot">
+  <h2>9. Troubleshooting</h2>
+  <table>
+    <tr><th>Problem</th><th>Solution</th></tr>
+    <tr><td>Gesture not detected</td><td>Better lighting, hold steadier, keep hand 30–60 cm from camera</td></tr>
+    <tr><td>Wrong word detected</td><td>Exaggerate the gesture more — spread fingers wider, curl tighter</td></tr>
+    <tr><td>System shows "Collecting..."</td><td>Your gesture hasn't been stable for 2 frames yet — hold still</td></tr>
+    <tr><td>Same word won't repeat</td><td>Put hand down, wait 1 second, show gesture again</td></tr>
+    <tr><td>"No hand" message</td><td>Move hand into the camera frame; ensure good lighting</td></tr>
+    <tr><td>Gesture words too general</td><td>Use Quick Phrase buttons for specific symptoms (e.g. "Cannot breathe", "Blurry vision")</td></tr>
+    <tr><td>Camera not working</td><td>Allow camera permissions in browser, check if another app is using the camera</td></tr>
+  </table>
+</div>
+
+<!-- 10. Practice Exercises -->
+<div class="section" id="practice">
+  <h2>10. Practice Exercises</h2>
+  <p>Use these exercises to train staff and patients on using the system effectively.</p>
+
+  <h3>Exercise 1: Basic Communication (All Departments)</h3>
+  <p>Practice these gestures in order, holding each for 1–2 seconds with a brief pause between:</p>
+  <table>
+    <tr><th>#</th><th>Gesture</th><th>Expected Word</th><th>Hold Time</th></tr>
+    <tr><td>1</td><td>🖐️ Open Palm</td><td>Hello</td><td>1.5s</td></tr>
+    <tr><td>2</td><td>— put hand down —</td><td>(reset)</td><td>1s</td></tr>
+    <tr><td>3</td><td>👍 Thumbs Up</td><td>Yes</td><td>1.5s</td></tr>
+    <tr><td>4</td><td>— put hand down —</td><td>(reset)</td><td>1s</td></tr>
+    <tr><td>5</td><td>✊ Fist</td><td>No</td><td>1.5s</td></tr>
+    <tr><td>6</td><td>— put hand down —</td><td>(reset)</td><td>1s</td></tr>
+    <tr><td>7</td><td>✌️ Peace</td><td>Thank you</td><td>1.5s</td></tr>
+  </table>
+  <p><strong>Expected sentence:</strong> "Hello Yes No Thank you"</p>
+
+  <h3>Exercise 2: Ophthalmology Visit</h3>
+  <p>Simulate a patient describing eye problems:</p>
+  <table>
+    <tr><th>#</th><th>Gesture</th><th>Expected Word</th></tr>
+    <tr><td>1</td><td>🖐️ Open Palm</td><td>Hello</td></tr>
+    <tr><td>2</td><td>🤏 Pinch</td><td>Eye pain</td></tr>
+    <tr><td>3</td><td>☝️ Pointing</td><td>This eye</td></tr>
+    <tr><td>4</td><td>👎 Thumbs Down</td><td>Blurry vision</td></tr>
+    <tr><td>5</td><td>👆 L-Shape</td><td>Need glasses</td></tr>
+    <tr><td>6</td><td>✌️ Peace</td><td>Thank you</td></tr>
+  </table>
+  <p><strong>Expected sentence:</strong> "Hello Eye pain This eye Blurry vision Need glasses Thank you"</p>
+
+  <h3>Exercise 3: Emergency Scenario</h3>
+  <table>
+    <tr><th>#</th><th>Gesture</th><th>Expected Word</th></tr>
+    <tr><td>1</td><td>🤘 Horns</td><td>Emergency</td></tr>
+    <tr><td>2</td><td>🤏 Pinch</td><td>Severe pain</td></tr>
+    <tr><td>3</td><td>☝️ Pointing</td><td>Bleeding here</td></tr>
+    <tr><td>4</td><td>👎 Thumbs Down</td><td>Getting worse</td></tr>
+    <tr><td>5</td><td>🤟 Three Up</td><td>Accident</td></tr>
+  </table>
+  <p><strong>Expected sentence:</strong> "Emergency Severe pain Bleeding here Getting worse Accident"</p>
+
+  <h3>Exercise 4: Speed Test</h3>
+  <p>Once comfortable, try completing Exercise 2 in under 30 seconds. Remember:</p>
+  <ul style="padding-left: 24px; color: #475569;">
+    <li>Hold each gesture steady — don't rush the hold</li>
+    <li>Transition quickly between gestures (the pause is the fast part)</li>
+    <li>Verify each word appears before moving to the next</li>
+  </ul>
+
+  <h3>Exercise 5: Letter Spelling</h3>
+  <p>Switch to <strong>Letters mode</strong> and spell: <strong>P-A-I-N</strong></p>
+  <p>Then switch back to <strong>Words mode</strong> and continue with gestures.</p>
+
+  <div class="tip">
+    <strong>💡 Training Goal:</strong> Staff should be able to demonstrate all 15 gestures correctly and explain each department's unique word mappings to patients. Patients should be able to build a 5-word sentence within 30 seconds.
+  </div>
+</div>
+
+<!-- Footer -->
+<div style="text-align: center; padding: 30px; color: #94a3b8; font-size: 0.85em;">
+  <p>Deaf AI Healthcare Assistant — Tygerberg Hospital</p>
+  <p>Powered by Google MediaPipe GestureRecognizer ML Model (open-source)</p>
+  <p>© 2026 — For training purposes only</p>
+</div>
+
+</div>
+</body>
+</html>

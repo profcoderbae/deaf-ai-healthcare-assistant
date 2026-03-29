@@ -49,24 +49,12 @@
         #prescriptionSection { display: none; }
         #qrResult { display: none; }
 
-        /* Sign Language Avatar Styles */
-        .sign-avatar-wrap {
-            position: relative;
-            background: linear-gradient(135deg, #F0FDFA 0%, #E0F7FA 50%, #E8F5E9 100%);
-            border-radius: 16px;
-            border: 2px solid #B2DFDB;
-            padding: 8px;
-        }
-        .sign-avatar-svg {
-            width: 100%;
-            height: auto;
-            display: block;
-        }
+        /* Sign Language Emoji Panel */
         .sign-avatar-panel {
             background: #F8FFFE;
             border: 2px solid #E0F2F1;
             border-radius: 16px;
-            padding: 12px;
+            padding: 8px;
             text-align: center;
         }
         .sign-progress-wrap {
@@ -188,11 +176,25 @@
                     <span class="text-xs bg-teal-100 text-teal-700 px-2 py-1 rounded-full">🤟 Signs detected here</span>
                 </h3>
 
-                <div class="webcam-container mx-auto" style="width:100%;max-width:500px;height:260px;">
+                <div class="webcam-container mx-auto" style="width:100%;max-width:100%;height:380px;">
                     <video id="transVideo" autoplay playsinline></video>
-                    <canvas id="transCanvas" width="640" height="480"></canvas>
+                    <canvas id="transCanvas" width="1280" height="720"></canvas>
                     <div class="webcam-label">Patient Camera</div>
                     <div class="gesture-indicator" id="transGestureInd"></div>
+                </div>
+
+                <!-- Detection Mode Buttons -->
+                <div class="flex gap-1 mt-2 justify-center">
+                    <button onclick="setTranslatorSignMode('glosses')" id="transModeGlosses" class="text-xs px-3 py-1 rounded-full bg-teal-600 text-white font-semibold">🤟 Words</button>
+                    <button onclick="setTranslatorSignMode('alpha')" id="transModeAlpha" class="text-xs px-3 py-1 rounded-full bg-gray-200 text-gray-600 font-semibold">🔤 Letters</button>
+                    <button onclick="setTranslatorSignMode('num')" id="transModeNum" class="text-xs px-3 py-1 rounded-full bg-gray-200 text-gray-600 font-semibold">🔢 Numbers</button>
+                </div>
+
+                <!-- Live Detection Display -->
+                <div class="bg-teal-50 rounded-xl p-3 mt-2 text-center">
+                    <div id="transDetectionValue" class="text-3xl font-bold text-teal-700 min-h-[48px]">—</div>
+                    <div id="transDetectionConf" class="text-xs text-gray-400 mt-1"></div>
+                    <div id="transConnectionStatus" class="text-xs mt-1"></div>
                 </div>
 
                 <!-- Sentence Builder -->
@@ -223,25 +225,16 @@
 
                 <!-- Quick Phrase Board -->
                 <div class="mt-3">
-                    <span class="text-xs font-bold text-gray-500 mb-2 block"><i class="fas fa-th mr-1"></i> Quick Phrases (tap to add)</span>
+                    <span class="text-xs font-bold text-gray-500 mb-2 block">
+                        <i class="fas fa-th mr-1"></i> Quick Phrases — <span id="deptLabel" class="text-teal-600">{{ patient.department_name or 'General Practice' }}</span>
+                    </span>
                     <div class="grid grid-cols-3 gap-1" id="quickPhraseBoard">
-                        <button onclick="addQuickPhrase('Hello')" class="qp-btn">👋 Hello</button>
-                        <button onclick="addQuickPhrase('Yes')" class="qp-btn">👍 Yes</button>
-                        <button onclick="addQuickPhrase('No')" class="qp-btn">✊ No</button>
-                        <button onclick="addQuickPhrase('I have pain')" class="qp-btn">😣 I have pain</button>
-                        <button onclick="addQuickPhrase('Help me')" class="qp-btn">🆘 Help me</button>
-                        <button onclick="addQuickPhrase('Thank you')" class="qp-btn">🙏 Thank you</button>
-                        <button onclick="addQuickPhrase('I need medicine')" class="qp-btn">💊 Need medicine</button>
-                        <button onclick="addQuickPhrase('I feel dizzy')" class="qp-btn">😵 Feel dizzy</button>
-                        <button onclick="addQuickPhrase('I need water')" class="qp-btn">💧 Need water</button>
-                        <button onclick="addQuickPhrase('My head hurts')" class="qp-btn">🤕 Head hurts</button>
-                        <button onclick="addQuickPhrase('My stomach hurts')" class="qp-btn">🤢 Stomach hurts</button>
-                        <button onclick="addQuickPhrase('I cannot breathe')" class="qp-btn">😮‍💨 Can't breathe</button>
+                        <!-- Populated dynamically by loadQuickPhrases() -->
                     </div>
                 </div>
 
                 <!-- Patient messages sent -->
-                <div class="translation-text mt-3" id="patientTranslation" style="max-height:140px;overflow-y:auto;">
+                <div class="translation-text mt-3" id="patientTranslation" style="max-height:200px;overflow-y:auto;">
                     <p class="text-gray-400 italic text-center text-sm">Sent messages appear here...</p>
                 </div>
 
@@ -272,9 +265,9 @@
                     </button>
                 </div>
 
-                <!-- Sign Language Avatar (large, animated word-by-word) -->
+                <!-- Sign Language Emoji Translator (large, visible word-by-word) -->
                 <div class="sign-avatar-panel">
-                    <div id="signAvatarContainer" style="width:340px;max-width:100%;margin:0 auto;"></div>
+                    <div id="signAvatarContainer" style="width:100%;max-width:100%;margin:0 auto;"></div>
                     <!-- Progress bar for word-by-word signing -->
                     <div id="signProgress" class="sign-progress-wrap" style="display:none;">
                         <div class="sign-progress-bar">
@@ -283,12 +276,12 @@
                         <div id="signProgressText" class="text-xs text-blue-600 text-center mt-1">Signing...</div>
                     </div>
                     <div id="avatarSignLabel" class="text-center text-sm text-gray-400 mt-2">
-                        <i class="fas fa-hand-sparkles mr-1"></i> Thandi will sign doctor's words here
+                        <i class="fas fa-hand-sparkles mr-1"></i> Emoji signs appear as doctor speaks
                     </div>
                 </div>
 
                 <!-- Doctor messages sent -->
-                <div class="translation-text mt-3" id="doctorTranslation" style="max-height:140px;overflow-y:auto;">
+                <div class="translation-text mt-3" id="doctorTranslation" style="max-height:200px;overflow-y:auto;">
                     <p class="text-gray-400 italic text-center text-sm">Doctor messages appear here...</p>
                 </div>
             </div>
@@ -376,13 +369,17 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="/static/js/gesture.js"></script>
     <script src="/static/js/avatar.js"></script>
     <script src="/static/js/sign_avatar.js"></script>
+    <script src="/static/js/sign_detect.js"></script>
     <script>
     // ─── State ───
+    let signDetectionClient = null;
     const patientId = {{ patient.id }};
     const patientData = {{ patient | tojson }};
+    const patientDepartment = patientData.department_name || 'General Practice';
     let consultationId = null;
     let isTranslating = false;
     let gestureDetector = null;
@@ -399,6 +396,9 @@
     let sentenceWords = [];
     let autoSendTimerId = null;
     const AUTO_SEND_DELAY = 6; // seconds
+    let lastAddedWord = '';
+    let lastAddedWordTime = 0;
+    const WORD_DEDUP_COOLDOWN = 3000; // 3s before same word can be added again
 
     // Gesture → word mapping (individual words, not full sentences)
     const GESTURE_WORD_MAP = {
@@ -415,10 +415,192 @@
     const POINTING_WORDS = ['Pain', 'Here', 'Head', 'Stomach', 'Chest', 'Arm', 'Leg', 'Back', 'Eye', 'Ear'];
     let pointingIndex = 0;
 
+    // Department-specific quick phrases
+    const DEPT_QUICK_PHRASES = {
+        'General Practice': [
+            { emoji: '👋', text: 'Hello' },
+            { emoji: '👍', text: 'Yes' },
+            { emoji: '✊', text: 'No' },
+            { emoji: '😣', text: 'I have pain' },
+            { emoji: '🆘', text: 'Help me' },
+            { emoji: '🙏', text: 'Thank you' },
+            { emoji: '💊', text: 'I need medicine' },
+            { emoji: '🤒', text: 'I have a fever' },
+            { emoji: '💧', text: 'I need water' },
+            { emoji: '🤕', text: 'My head hurts' },
+            { emoji: '🤢', text: 'I feel nauseous' },
+            { emoji: '😴', text: 'I feel tired' },
+        ],
+        'Emergency Department': [
+            { emoji: '🆘', text: 'Emergency help' },
+            { emoji: '🩸', text: 'I am bleeding' },
+            { emoji: '😣', text: 'Severe pain' },
+            { emoji: '😵', text: 'I feel faint' },
+            { emoji: '🦴', text: 'Something is broken' },
+            { emoji: '💊', text: 'I took medicine' },
+            { emoji: '🤮', text: 'I am vomiting' },
+            { emoji: '🫁', text: 'Cannot breathe' },
+            { emoji: '⬇️', text: 'I fell down' },
+            { emoji: '🚗', text: 'Car accident' },
+            { emoji: '🤕', text: 'Head injury' },
+            { emoji: '⚡', text: 'Getting worse' },
+        ],
+        'Cardiology': [
+            { emoji: '❤️', text: 'Chest pain' },
+            { emoji: '💓', text: 'Heart racing' },
+            { emoji: '😮‍💨', text: 'Short of breath' },
+            { emoji: '😵', text: 'Feeling dizzy' },
+            { emoji: '💊', text: 'Heart medicine' },
+            { emoji: '🩺', text: 'Blood pressure high' },
+            { emoji: '🦵', text: 'Legs swollen' },
+            { emoji: '😣', text: 'Chest tight' },
+            { emoji: '😴', text: 'Very tired' },
+            { emoji: '🫀', text: 'Heart fluttering' },
+            { emoji: '🤢', text: 'Feel nauseous' },
+            { emoji: '💧', text: 'Sweating a lot' },
+        ],
+        'Orthopedics': [
+            { emoji: '🦴', text: 'Bone pain' },
+            { emoji: '🦵', text: 'Knee pain' },
+            { emoji: '💪', text: 'Arm pain' },
+            { emoji: '🔙', text: 'Back pain' },
+            { emoji: '🦶', text: 'Cannot walk' },
+            { emoji: '🤕', text: 'Shoulder pain' },
+            { emoji: '✊', text: 'Cannot grip' },
+            { emoji: '🩹', text: 'Need brace' },
+            { emoji: '💊', text: 'Pain medicine' },
+            { emoji: '🏥', text: 'Need X-ray' },
+            { emoji: '📏', text: 'Swollen joint' },
+            { emoji: '🔄', text: 'Cannot bend' },
+        ],
+        'Dermatology': [
+            { emoji: '🔴', text: 'Rash here' },
+            { emoji: '😣', text: 'Itching badly' },
+            { emoji: '🔥', text: 'Burning skin' },
+            { emoji: '💊', text: 'Need cream' },
+            { emoji: '⬆️', text: 'Getting worse' },
+            { emoji: '🤧', text: 'Allergic reaction' },
+            { emoji: '💧', text: 'Skin dry' },
+            { emoji: '🩹', text: 'Wound not healing' },
+            { emoji: '☀️', text: 'Sun burn' },
+            { emoji: '🫧', text: 'Blisters' },
+            { emoji: '📏', text: 'Swollen area' },
+            { emoji: '⏰', text: 'Started recently' },
+        ],
+        'Ophthalmology': [
+            { emoji: '👁️', text: 'Eye pain' },
+            { emoji: '😵', text: 'Blurry vision' },
+            { emoji: '💧', text: 'Eyes watering' },
+            { emoji: '🔴', text: 'Eye is red' },
+            { emoji: '👓', text: 'Need glasses' },
+            { emoji: '🌟', text: 'Sensitive to light' },
+            { emoji: '💊', text: 'Need eye drops' },
+            { emoji: '🔍', text: 'Cannot see far' },
+            { emoji: '📖', text: 'Cannot read' },
+            { emoji: '🤕', text: 'Headache from eyes' },
+            { emoji: '✨', text: 'Seeing flashes' },
+            { emoji: '⬇️', text: 'Vision getting worse' },
+        ],
+        'ENT': [
+            { emoji: '👂', text: 'Ear pain' },
+            { emoji: '🔇', text: 'Cannot hear well' },
+            { emoji: '🔔', text: 'Ringing in ear' },
+            { emoji: '👃', text: 'Nose blocked' },
+            { emoji: '🤧', text: 'Sinus pain' },
+            { emoji: '😷', text: 'Sore throat' },
+            { emoji: '🍽️', text: 'Cannot swallow' },
+            { emoji: '🗣️', text: 'Lost my voice' },
+            { emoji: '💊', text: 'Need medicine' },
+            { emoji: '🤒', text: 'Ear infection' },
+            { emoji: '💧', text: 'Ear draining' },
+            { emoji: '😮‍💨', text: 'Snoring problem' },
+        ],
+        'Neurology': [
+            { emoji: '🤕', text: 'Bad headache' },
+            { emoji: '😵', text: 'Very dizzy' },
+            { emoji: '⚡', text: 'Had a seizure' },
+            { emoji: '🔢', text: 'Numbness' },
+            { emoji: '🧠', text: 'Memory problems' },
+            { emoji: '💫', text: 'Tingling feeling' },
+            { emoji: '😴', text: 'Cannot sleep' },
+            { emoji: '👁️', text: 'Vision problems' },
+            { emoji: '🦵', text: 'Legs feel weak' },
+            { emoji: '💊', text: 'Need medicine' },
+            { emoji: '🤚', text: 'Hands shaking' },
+            { emoji: '🔄', text: 'Losing balance' },
+        ],
+        'Psychiatry & Mental Health': [
+            { emoji: '😰', text: 'Feeling anxious' },
+            { emoji: '😢', text: 'Feeling sad' },
+            { emoji: '😤', text: 'Feeling stressed' },
+            { emoji: '😱', text: 'Having panic attacks' },
+            { emoji: '😴', text: 'Cannot sleep' },
+            { emoji: '💊', text: 'Need medication' },
+            { emoji: '🗣️', text: 'Need to talk' },
+            { emoji: '😶', text: 'Feel alone' },
+            { emoji: '😣', text: 'Thoughts racing' },
+            { emoji: '🍽️', text: 'Not eating' },
+            { emoji: '😔', text: 'No energy' },
+            { emoji: '🆘', text: 'Need help now' },
+        ],
+        'Gastroenterology': [
+            { emoji: '🤢', text: 'Stomach pain' },
+            { emoji: '🤮', text: 'Vomiting' },
+            { emoji: '💩', text: 'Diarrhea' },
+            { emoji: '🍽️', text: 'Cannot eat' },
+            { emoji: '🔥', text: 'Heartburn' },
+            { emoji: '📏', text: 'Bloated' },
+            { emoji: '💊', text: 'Need medicine' },
+            { emoji: '🩸', text: 'Blood in stool' },
+            { emoji: '😣', text: 'Stomach cramps' },
+            { emoji: '💧', text: 'Very thirsty' },
+            { emoji: '⚖️', text: 'Losing weight' },
+            { emoji: '🤒', text: 'Fever with stomach' },
+        ],
+        'Pulmonology': [
+            { emoji: '🫁', text: 'Cannot breathe' },
+            { emoji: '🤧', text: 'Coughing a lot' },
+            { emoji: '😮‍💨', text: 'Wheezing' },
+            { emoji: '💊', text: 'Need inhaler' },
+            { emoji: '😣', text: 'Chest pain' },
+            { emoji: '🌡️', text: 'Asthma attack' },
+            { emoji: '😴', text: 'Cannot sleep flat' },
+            { emoji: '🩸', text: 'Coughing blood' },
+            { emoji: '😷', text: 'Hard to breathe' },
+            { emoji: '⬆️', text: 'Getting worse' },
+            { emoji: '🏃', text: 'Short of breath walking' },
+            { emoji: '🌬️', text: 'Tight chest' },
+        ],
+        'Pharmacy': [
+            { emoji: '💊', text: 'Need prescription' },
+            { emoji: '🔄', text: 'Refill medicine' },
+            { emoji: '⚠️', text: 'Side effects' },
+            { emoji: '🤧', text: 'Allergic to medicine' },
+            { emoji: '❓', text: 'How to take this' },
+            { emoji: '📋', text: 'My prescription' },
+            { emoji: '💰', text: 'Cost of medicine' },
+            { emoji: '⏰', text: 'When to take it' },
+            { emoji: '🚫', text: 'Medicine not working' },
+            { emoji: '👶', text: 'Child medicine' },
+            { emoji: '🤰', text: 'Pregnancy safe' },
+            { emoji: '💉', text: 'Need injection' },
+        ],
+    };
+
+    // ─── Load Department Quick Phrases ───
+    function loadQuickPhrases() {
+        const phrases = DEPT_QUICK_PHRASES[patientDepartment] || DEPT_QUICK_PHRASES['General Practice'];
+        const board = document.getElementById('quickPhraseBoard');
+        board.innerHTML = phrases.map(p =>
+            `<button onclick="addQuickPhrase('${p.text.replace(/'/g, "\\'")}')" class="qp-btn">${p.emoji} ${p.text}</button>`
+        ).join('');
+    }
+
     // ─── Init ───
     document.addEventListener('DOMContentLoaded', () => {
         const preAvatar = new HealthcareAvatar('preAvatar');
         preAvatar.setExpression('happy');
+        loadQuickPhrases();
     });
 
     // ─── Translation Toggle ───
@@ -431,7 +613,7 @@
             document.getElementById('liveBadge').style.display = 'inline-block';
 
             // Init sign language avatar (word-by-word animated)
-            signAvatar = new SignLanguageAvatar('signAvatarContainer', { width: 340, height: 480 });
+            signAvatar = new SignLanguageAvatar('signAvatarContainer');
 
             // Start consultation
             try {
@@ -449,15 +631,58 @@
                 console.error('Failed to start consultation:', e);
             }
 
-            // Start webcam for sign detection
+            // Start webcam for sign detection (SocketIO-based)
             try {
-                gestureDetector = new GestureDetector();
                 const video = document.getElementById('transVideo');
                 const canvas = document.getElementById('transCanvas');
-                await gestureDetector.init(video, canvas, onPatientGesture);
-                await gestureDetector.start();
+                const statusEl = document.getElementById('transConnectionStatus');
+
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }
+                });
+                video.srcObject = stream;
+                await video.play();
+                statusEl.innerHTML = '<span class="text-blue-500"><i class="fas fa-spinner fa-spin mr-1"></i> Connecting sign detection...</span>';
+
+                signDetectionClient = new SignDetectionClient({
+                    video: video,
+                    canvas: canvas,
+                    mode: 'glosses',
+                    captureRate: 200,
+                    onDetection: onSignDetection,
+                    onStatusChange: (status) => {
+                        console.log('[Translator Sign] Status:', status);
+                        if (status === 'connected') {
+                            statusEl.innerHTML = '<span class="text-green-600"><i class="fas fa-check-circle mr-1"></i> Sign detection connected</span>';
+                            setTimeout(() => { statusEl.textContent = ''; }, 3000);
+                        } else if (status === 'disconnected') {
+                            statusEl.innerHTML = '<span class="text-red-500"><i class="fas fa-exclamation-circle mr-1"></i> Disconnected</span>';
+                        } else if (status === 'active') {
+                            statusEl.innerHTML = '<span class="text-green-500"><i class="fas fa-video mr-1"></i> Camera active</span>';
+                        }
+                    }
+                });
+                await signDetectionClient.init();
+                await signDetectionClient.start();
+                // Send department context for medical sign mapping
+                if (signDetectionClient.socket && signDetectionClient.socket.connected) {
+                    signDetectionClient.socket.emit('set_department', { department: patientDepartment });
+                }
             } catch(e) {
-                console.warn('Gesture detection unavailable:', e);
+                console.warn('Sign detection unavailable, falling back to gesture detector:', e);
+                const statusEl = document.getElementById('transConnectionStatus');
+                statusEl.innerHTML = '<span class="text-yellow-600"><i class="fas fa-exclamation-triangle mr-1"></i> Using basic gesture detection</span>';
+                // Fallback to old GestureDetector
+                try {
+                    gestureDetector = new GestureDetector();
+                    const video = document.getElementById('transVideo');
+                    const canvas = document.getElementById('transCanvas');
+                    await gestureDetector.init(video, canvas, onPatientGesture);
+                    await gestureDetector.start();
+                } catch(e2) {
+                    console.warn('Gesture detection also unavailable:', e2);
+                    statusEl.innerHTML = '<span class="text-red-500"><i class="fas fa-times-circle mr-1"></i> Camera unavailable</span>';
+                }
             }
 
             // Init speech recognition for doctor
@@ -467,9 +692,65 @@
             isTranslating = false;
             document.getElementById('translateBtn').innerHTML = '<i class="fas fa-play mr-1"></i> Start Translation';
             document.getElementById('liveBadge').style.display = 'none';
+            if (signDetectionClient) { signDetectionClient.destroy(); signDetectionClient = null; }
             if (gestureDetector) gestureDetector.stop();
             if (recognition) recognition.stop();
+
+            // Stop webcam
+            const video = document.getElementById('transVideo');
+            if (video && video.srcObject) {
+                video.srcObject.getTracks().forEach(t => t.stop());
+                video.srcObject = null;
+            }
         }
+    }
+
+    // ─── SocketIO Sign Detection → Sentence Builder ───
+    function onSignDetection(result) {
+        const indicator = document.getElementById('transGestureInd');
+        const valueEl = document.getElementById('transDetectionValue');
+        const confEl = document.getElementById('transDetectionConf');
+
+        if (result.type === 'letter' || result.type === 'number') {
+            valueEl.textContent = result.value;
+            confEl.textContent = `Confidence: ${(result.confidence * 100).toFixed(0)}%`;
+            indicator.textContent = result.value;
+            indicator.classList.add('active');
+            setTimeout(() => indicator.classList.remove('active'), 1500);
+            addWordToSentence(result.value);
+        } else if (result.type === 'word') {
+            valueEl.textContent = result.value;
+            confEl.textContent = result.gesture ? `Gesture: ${result.gesture}` : '';
+            indicator.textContent = result.value;
+            indicator.classList.add('active');
+            setTimeout(() => indicator.classList.remove('active'), 2000);
+            addWordToSentence(result.value);
+        } else if (result.type === 'status') {
+            if (result.status === 'collecting') {
+                valueEl.textContent = '...';
+                confEl.textContent = `Collecting frames: ${result.frames || ''}`;
+            } else if (result.status === 'no_hand') {
+                valueEl.textContent = '✋';
+                confEl.textContent = 'Show your hand';
+            } else if (result.status === 'scanning') {
+                confEl.textContent = 'Scanning...';
+            }
+        }
+    }
+
+    function setTranslatorSignMode(mode) {
+        if (!signDetectionClient) return;
+        signDetectionClient.setMode(mode);
+        ['glosses', 'alpha', 'num'].forEach(m => {
+            const btn = document.getElementById('transMode' + m.charAt(0).toUpperCase() + m.slice(1));
+            if (btn) {
+                btn.className = m === mode
+                    ? 'text-xs px-3 py-1 rounded-full bg-teal-600 text-white font-semibold'
+                    : 'text-xs px-3 py-1 rounded-full bg-gray-200 text-gray-600 font-semibold';
+            }
+        });
+        document.getElementById('transDetectionValue').textContent = '—';
+        document.getElementById('transDetectionConf').textContent = '';
     }
 
     // ─── Patient Gesture → Sentence Builder ───
@@ -492,7 +773,28 @@
     }
 
     // ─── Sentence Builder Functions ───
+    // Track recent words to prevent any repetition within time window
+    const recentWordTimes = {};  // word → last-added timestamp
+    const WORD_BLOCK_WINDOW = 5000;  // 5 seconds — must match server
+
     function addWordToSentence(word) {
+        const now = Date.now();
+        // Block 1: same consecutive word
+        const lastWord = sentenceWords.length > 0 ? sentenceWords[sentenceWords.length - 1] : null;
+        if (word === lastWord) {
+            return;  // never allow same word consecutively
+        }
+        // Block 2: any word seen in last 5 seconds (matches server history dedup)
+        if (recentWordTimes[word] && (now - recentWordTimes[word]) < WORD_BLOCK_WINDOW) {
+            return;
+        }
+        // Block 3: don't allow the same word more than once in the current sentence
+        if (sentenceWords.includes(word)) {
+            return;
+        }
+        recentWordTimes[word] = now;
+        lastAddedWord = word;
+        lastAddedWordTime = now;
         sentenceWords.push(word);
         renderSentenceBuilder();
         resetAutoSend();
@@ -547,11 +849,28 @@
 
     function sendPatientSentence() {
         if (sentenceWords.length === 0) return;
-        const message = sentenceWords.join(' ');
+        const rawMessage = sentenceWords.join(' ');
         cancelAutoSend();
         sentenceWords = [];
+        // Clear recentWordTimes so new sentence can use words again
+        Object.keys(recentWordTimes).forEach(k => delete recentWordTimes[k]);
         renderSentenceBuilder();
-        addPatientMessage(message);
+
+        // Use AI to clean up fragmented sign words into a proper sentence
+        fetch('/api/cleanup-sentence', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ raw: rawMessage })
+        })
+        .then(resp => resp.json())
+        .then(data => {
+            const cleaned = data.cleaned || rawMessage;
+            addPatientMessage(cleaned);
+        })
+        .catch(() => {
+            // Fallback: send raw words if cleanup fails
+            addPatientMessage(rawMessage);
+        });
     }
 
     function resetAutoSend() {
@@ -647,7 +966,26 @@
             }
         };
 
-        recognition.onerror = (e) => console.warn('Speech recognition error:', e.error);
+        recognition.onerror = (e) => {
+            console.warn('Speech recognition error:', e.error);
+            // Restart on recoverable errors
+            if (e.error === 'no-speech' || e.error === 'aborted' || e.error === 'network') {
+                if (isMicActive) {
+                    setTimeout(() => {
+                        try { recognition.start(); } catch(ex) {}
+                    }, 500);
+                }
+            }
+        };
+
+        // Auto-restart when Chrome's speech recognition stops
+        recognition.onend = () => {
+            if (isMicActive) {
+                setTimeout(() => {
+                    try { recognition.start(); } catch(ex) {}
+                }, 300);
+            }
+        };
     }
 
     function toggleMicrophone() {
@@ -692,6 +1030,9 @@
         ).join('');
         container.scrollTop = container.scrollHeight;
 
+        // Read doctor message aloud for accessibility
+        queueSpeak('Doctor says: ' + message);
+
         // Use the new sign language avatar to sign word-by-word
         if (signAvatar) {
             const progressWrap = document.getElementById('signProgress');
@@ -712,9 +1053,9 @@
                 onDone: () => {
                     progressWrap.style.display = 'none';
                     progressFill.style.width = '0%';
-                    label.innerHTML = '<span class="text-green-600"><i class="fas fa-check-circle mr-1"></i> Done signing message</span>';
+                    label.innerHTML = '<span class="text-green-600"><i class="fas fa-check-circle mr-1"></i> Message signed!</span>';
                     setTimeout(() => {
-                        label.innerHTML = '<i class="fas fa-hand-sparkles mr-1"></i> Thandi will sign doctor\'s words here';
+                        label.innerHTML = '<i class="fas fa-hand-sparkles mr-1"></i> Emoji signs appear as doctor speaks';
                     }, 3000);
                 }
             });

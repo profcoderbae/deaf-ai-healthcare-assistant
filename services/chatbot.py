@@ -304,3 +304,99 @@ class HealthcareChatbot:
             return "Noted. The doctor will take this into account."
         else:
             return "The patient is communicating. Let me help translate that for you."
+
+    def cleanup_sign_sentence(self, raw_words):
+        """Clean up raw sign language words into a proper sentence.
+
+        Takes fragmented gesture words like 'Hello Pain There Help Medicine'
+        and converts them into natural language like 'Hello, I have pain there. I need help with medicine.'
+        """
+        if not raw_words or not raw_words.strip():
+            return raw_words
+
+        # If it's already a short clear message, return as-is
+        word_list = raw_words.strip().split()
+        if len(word_list) <= 2:
+            return raw_words.strip()
+
+        if self.provider == 'demo' or not self.client:
+            return self._demo_cleanup(raw_words)
+
+        cleanup_prompt = (
+            "You are a sign language interpreter at a hospital. "
+            "A deaf patient communicated using South African Sign Language gestures. "
+            "Each gesture maps to a word. The raw words detected are shown below. "
+            "Your job: rewrite these words into a SHORT, natural English sentence that preserves the patient's meaning. "
+            "Rules:\n"
+            "- Keep it SHORT (1 sentence, max 15 words)\n"
+            "- Do NOT add symptoms or info the patient didn't say\n"
+            "- Do NOT ask questions — just restate what the patient said\n"
+            "- Remove duplicate/repeated words\n"
+            "- If words are: Hello Pain There Medicine → output: Hello, I have pain there. I need medicine.\n"
+            "- If words are: Yes Thank you → output: Yes, thank you.\n"
+            "- If words are: No Feeling bad Help → output: No, I feel bad. I need help.\n"
+            "- Output ONLY the cleaned sentence, nothing else."
+        )
+
+        try:
+            messages = [
+                {"role": "system", "content": cleanup_prompt},
+                {"role": "user", "content": raw_words}
+            ]
+            if self.provider == 'groq':
+                response = self.client.chat.completions.create(
+                    model=config.GROQ_MODEL,
+                    messages=messages,
+                    max_tokens=60,
+                    temperature=0.3
+                )
+                return response.choices[0].message.content.strip()
+            elif self.provider == 'openai':
+                response = self.client.chat.completions.create(
+                    model=config.OPENAI_MODEL,
+                    messages=messages,
+                    max_tokens=60,
+                    temperature=0.3
+                )
+                return response.choices[0].message.content.strip()
+        except Exception:
+            return self._demo_cleanup(raw_words)
+
+        return self._demo_cleanup(raw_words)
+
+    def _demo_cleanup(self, raw_words):
+        """Simple rule-based cleanup when AI is unavailable."""
+        words = raw_words.strip().split()
+        # Remove consecutive duplicates
+        cleaned = [words[0]]
+        for w in words[1:]:
+            if w.lower() != cleaned[-1].lower():
+                cleaned.append(w)
+
+        # Simple sentence patterns
+        result = ' '.join(cleaned)
+
+        # Add punctuation helpers
+        replacements = {
+            'Hello ': 'Hello, ',
+            'Yes ': 'Yes, ',
+            'No ': 'No, ',
+            'Thank you': 'Thank you.',
+            'Pain': 'I have pain',
+            'Help': 'I need help',
+            'Medicine': 'I need medicine',
+            'Need': 'I need',
+            'Feeling bad': 'I feel bad',
+            'There': 'there',
+            'OK': 'OK.',
+            'Please wait': 'please wait',
+            'Wait': 'wait',
+            'Call': 'please call',
+        }
+        for old, new in replacements.items():
+            if result.startswith(old + ' ') or result == old:
+                result = result.replace(old, new, 1)
+
+        if not result.endswith('.') and not result.endswith('!') and not result.endswith('?'):
+            result += '.'
+        return result

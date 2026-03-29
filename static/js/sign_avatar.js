@@ -1,640 +1,779 @@
 /**
- * Realistic Sign Language Avatar Engine v2
- * - Anatomically proportioned human figure with skin shading, detailed face
- * - 2-bone inverse-kinematics arm system: hands move to exact body coordinates
- * - Articulated 5-finger hand shapes with per-segment bending
- * - Sign poses based on real sign language positions (chin, forehead, chest, etc.)
- * - Smooth ease-in-out interpolation between poses
- * - Secondary motions (wave, nod, tap, circle, twist) for realism
+ * Emoji Sign Language Translator v6
+ * ──────────────────────────────────
+ * Enhanced with features from Hearing & Speech Hackathon project.
+ *
+ * Improvements over v5:
+ *  - Proper ASL fingerspelling alphabet with correct hand-shape emojis
+ *  - Per-sign duration (fast: 500ms, normal: 800ms, slow: 1200ms)
+ *  - Pause between fingerspelled words for visual clarity
+ *  - Sign type badge (WORD SIGN vs FINGERSPELLING vs PAUSE)
+ *  - Replay & Stop controls
+ *  - 180+ word→emoji mappings (medical + general)
+ *  - Animated hand character above emoji
+ *  - Progress counter "Sign 3 of 8"
  */
 
 class SignLanguageAvatar {
     constructor(containerId, opts = {}) {
         this.container = document.getElementById(containerId);
-        this.W = opts.width || 340;
-        this.H = opts.height || 480;
         this.isSigning = false;
         this.uid = containerId;
-
-        // Body reference points (viewBox 0,0,340,480)
-        this.B = {
-            headCx: 170, headCy: 100, headRx: 42, headRy: 52,
-            shoulderY: 182,
-            lShoulder: { x: 108, y: 182 },
-            rShoulder: { x: 232, y: 182 },
-            chin: { x: 170, y: 152 },
-            forehead: { x: 170, y: 72 },
-            chest: { x: 170, y: 230 },
-            stomach: { x: 170, y: 300 },
-            rWristRest: { x: 252, y: 340 },
-            lWristRest: { x: 88, y: 340 },
-        };
-
-        // Hand interpolation state
-        this._lhTarget = { ...this.B.lWristRest };
-        this._rhTarget = { ...this.B.rWristRest };
-        this._lhCurrent = { ...this.B.lWristRest };
-        this._rhCurrent = { ...this.B.rWristRest };
-        this._lHandRot = 0;
-        this._rHandRot = 0;
-        this._interpT = 1;
-        this._animId = null;
-
+        this._lastText = '';
+        this._lastOpts = {};
+        this._timeoutId = null;
         this.render();
-        this._startAnimLoop();
     }
 
-    // ═══════════════ RENDERING ═══════════════
+    /* ═══════════════════════════════════════════════════════════════
+       RENDER — Emoji display panel with controls
+       ═══════════════════════════════════════════════════════════════ */
     render() {
         const u = this.uid;
         this.container.innerHTML = `
-        <div class="sign-avatar-wrap" id="${u}_wrap">
-          <svg id="${u}_svg" viewBox="0 0 ${this.W} ${this.H}" xmlns="http://www.w3.org/2000/svg"
-               style="width:100%;height:auto;display:block;user-select:none;">
-            <defs>
-              <radialGradient id="${u}_skinG" cx="50%" cy="40%" r="55%">
-                <stop offset="0%" stop-color="#E8C4A0"/>
-                <stop offset="70%" stop-color="#D4A574"/>
-                <stop offset="100%" stop-color="#C49564"/>
-              </radialGradient>
-              <linearGradient id="${u}_scrubG" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#16A394"/>
-                <stop offset="50%" stop-color="#0F8C7F"/>
-                <stop offset="100%" stop-color="#0B7068"/>
-              </linearGradient>
-              <filter id="${u}_shadow" x="-10%" y="-10%" width="130%" height="130%">
-                <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#00000020"/>
-              </filter>
-              <radialGradient id="${u}_hairG" cx="50%" cy="30%" r="60%">
-                <stop offset="0%" stop-color="#3D2317"/>
-                <stop offset="100%" stop-color="#1A0E08"/>
-              </radialGradient>
-              <linearGradient id="${u}_lipG" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#D4706A"/>
-                <stop offset="100%" stop-color="#B85A55"/>
-              </linearGradient>
-            </defs>
+        <div id="${u}_panel" style="
+            background: linear-gradient(135deg, #F0FDFA 0%, #E0F7FA 50%, #E8F5E9 100%);
+            border-radius: 20px;
+            border: 3px solid #B2DFDB;
+            padding: 24px 16px;
+            text-align: center;
+            min-height: 380px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        ">
+            <!-- Idle state -->
+            <div id="${u}_idle" style="display:flex;flex-direction:column;align-items:center;gap:12px;">
+                <div style="font-size:80px;line-height:1;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.15));">🤟</div>
+                <div style="font-size:18px;font-weight:700;color:#0D9488;">Thandi — Sign Language Translator</div>
+                <div style="font-size:14px;color:#64748B;">Doctor's words will appear here as emoji signs</div>
+            </div>
 
-            <!-- ── BODY ── -->
-            <g id="${u}_bodyGroup">
-              <path d="M108,182 Q100,184 92,200 L80,260 L78,360 Q78,380 100,380 L240,380 Q262,380 262,360 L260,260 L248,200 Q240,184 232,182 L198,174 Q170,168 142,174 Z"
-                    fill="url(#${u}_scrubG)" filter="url(#${u}_shadow)"/>
-              <path d="M142,176 L170,210 L198,176" fill="none" stroke="#0A6B60" stroke-width="2.5" stroke-linejoin="round"/>
-              <path d="M142,176 Q148,185 155,192" fill="none" stroke="#0E8073" stroke-width="1.2"/>
-              <path d="M198,176 Q192,185 185,192" fill="none" stroke="#0E8073" stroke-width="1.2"/>
-              <line x1="170" y1="210" x2="170" y2="375" stroke="#0A6B60" stroke-width="0.6" opacity="0.3"/>
-              <path d="M148,180 Q144,210 148,235 Q152,250 158,248 Q166,258 174,248 Q180,250 184,235 Q188,210 184,180"
-                    fill="none" stroke="#5A5A6A" stroke-width="3" stroke-linecap="round"/>
-              <circle cx="166" cy="254" r="7" fill="#7A7A8A" stroke="#5A5A6A" stroke-width="2"/>
-              <circle cx="166" cy="254" r="3" fill="#9A9AAA"/>
-              <rect x="185" y="220" width="48" height="20" rx="4" fill="white" stroke="#D0D5DD" stroke-width="1"/>
-              <text x="209" y="234" text-anchor="middle" font-size="8.5" font-weight="700" fill="#0D9488" font-family="Arial,sans-serif">THANDI</text>
-              <path d="M148,152 L148,178 Q148,182 154,182 L186,182 Q192,182 192,178 L192,152"
-                    fill="url(#${u}_skinG)"/>
-              <path d="M155,160 Q170,165 185,160" fill="none" stroke="#C49060" stroke-width="0.8" opacity="0.3"/>
-              <g id="${u}_headGroup">
-                <ellipse cx="170" cy="100" rx="44" ry="54" fill="url(#${u}_skinG)"/>
-                <path d="M130,115 Q140,155 170,158 Q200,155 210,115" fill="none" stroke="#C49060" stroke-width="0.6" opacity="0.25"/>
-                <ellipse cx="125" cy="105" rx="7" ry="12" fill="#D4A574" stroke="#C49060" stroke-width="0.8"/>
-                <ellipse cx="125" cy="105" rx="4" ry="8" fill="none" stroke="#C49060" stroke-width="0.6"/>
-                <ellipse cx="215" cy="105" rx="7" ry="12" fill="#D4A574" stroke="#C49060" stroke-width="0.8"/>
-                <ellipse cx="215" cy="105" rx="4" ry="8" fill="none" stroke="#C49060" stroke-width="0.6"/>
-                <path d="M126,95 Q126,42 170,38 Q214,42 214,95 Q214,70 200,58 Q185,48 170,47 Q155,48 140,58 Q126,70 126,95 Z"
-                      fill="url(#${u}_hairG)"/>
-                <path d="M132,80 Q145,52 170,48 Q195,52 208,80" fill="none" stroke="#2A1508" stroke-width="1.5" opacity="0.3"/>
-                <path d="M135,90 Q150,65 170,60 Q190,65 205,90" fill="none" stroke="#2A1508" stroke-width="0.8" opacity="0.2"/>
-                <circle cx="206" cy="72" r="5.5" fill="#F7B731" stroke="#E09F20" stroke-width="1"/>
-                <circle cx="206" cy="72" r="2.5" fill="#FFD866"/>
-                <g id="${u}_eyes">
-                  <ellipse cx="152" cy="102" rx="10" ry="7.5" fill="white" stroke="#C9B090" stroke-width="0.6"/>
-                  <ellipse cx="188" cy="102" rx="10" ry="7.5" fill="white" stroke="#C9B090" stroke-width="0.6"/>
-                  <circle cx="152" cy="103" r="5" fill="#3D2B1F"/>
-                  <circle cx="188" cy="103" r="5" fill="#3D2B1F"/>
-                  <circle cx="152" cy="103" r="2.5" fill="#1A0E08"/>
-                  <circle cx="188" cy="103" r="2.5" fill="#1A0E08"/>
-                  <circle cx="149" cy="100" r="2" fill="white" opacity="0.85"/>
-                  <circle cx="185" cy="100" r="2" fill="white" opacity="0.85"/>
-                  <circle cx="154" cy="105" r="1" fill="white" opacity="0.5"/>
-                  <circle cx="190" cy="105" r="1" fill="white" opacity="0.5"/>
-                  <path id="${u}_lLid" d="M141,99 Q152,93 163,99" fill="none" stroke="#3D2317" stroke-width="1.8" stroke-linecap="round"/>
-                  <path id="${u}_rLid" d="M177,99 Q188,93 199,99" fill="none" stroke="#3D2317" stroke-width="1.8" stroke-linecap="round"/>
-                  <path d="M143,107 Q152,111 161,107" fill="none" stroke="#6B4A3A" stroke-width="0.6" opacity="0.4"/>
-                  <path d="M179,107 Q188,111 197,107" fill="none" stroke="#6B4A3A" stroke-width="0.6" opacity="0.4"/>
-                </g>
-                <path id="${u}_lBrow" d="M139,88 Q148,82 161,87" fill="none" stroke="#2A1508" stroke-width="2.5" stroke-linecap="round"/>
-                <path id="${u}_rBrow" d="M179,87 Q192,82 201,88" fill="none" stroke="#2A1508" stroke-width="2.5" stroke-linecap="round"/>
-                <path d="M168,108 Q165,120 162,127 Q166,131 170,132 Q174,131 178,127 Q175,120 172,108"
-                      fill="none" stroke="#C49060" stroke-width="1.2" stroke-linecap="round"/>
-                <circle cx="165" cy="128" r="1.8" fill="#C49060" opacity="0.3"/>
-                <circle cx="175" cy="128" r="1.8" fill="#C49060" opacity="0.3"/>
-                <g id="${u}_mouthG">
-                  <path id="${u}_mouth" d="M155,143 Q162,149 170,150 Q178,149 185,143"
-                        fill="url(#${u}_lipG)" stroke="#B85A55" stroke-width="0.8"/>
-                  <path d="M155,143 Q162,140 170,142 Q178,140 185,143" fill="none" stroke="#C46A64" stroke-width="0.6"/>
-                </g>
-                <path d="M140,120 Q138,130 142,138" fill="none" stroke="#C49060" stroke-width="0.5" opacity="0.2"/>
-                <path d="M200,120 Q202,130 198,138" fill="none" stroke="#C49060" stroke-width="0.5" opacity="0.2"/>
-              </g>
-            </g>
+            <!-- Active signing display -->
+            <div id="${u}_active" style="display:none;flex-direction:column;align-items:center;gap:4px;width:100%;">
+                <!-- Sign type badge -->
+                <div id="${u}_badge" style="
+                    display: inline-block;
+                    padding: 3px 12px;
+                    border-radius: 20px;
+                    font-size: 11px;
+                    font-weight: 700;
+                    letter-spacing: 1px;
+                    text-transform: uppercase;
+                    margin-bottom: 4px;
+                    background: #DBEAFE;
+                    color: #1E40AF;
+                ">WORD SIGN</div>
 
-            <!-- ── LEFT ARM (IK) ── -->
-            <g id="${u}_lArmG">
-              <path id="${u}_lArm" d="" fill="none" stroke="url(#${u}_scrubG)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
-              <path id="${u}_lForearm" d="" fill="none" stroke="url(#${u}_skinG)" stroke-width="14" stroke-linecap="round"/>
-              <g id="${u}_lHand" transform="translate(88,340)"></g>
-            </g>
+                <!-- Big emoji -->
+                <div id="${u}_emoji" style="
+                    font-size: 120px;
+                    line-height: 1;
+                    filter: drop-shadow(0 6px 20px rgba(0,0,0,0.2));
+                    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
+                    transform: scale(1);
+                    min-height: 140px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                ">🤟</div>
 
-            <!-- ── RIGHT ARM (IK) ── -->
-            <g id="${u}_rArmG">
-              <path id="${u}_rArm" d="" fill="none" stroke="url(#${u}_scrubG)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
-              <path id="${u}_rForearm" d="" fill="none" stroke="url(#${u}_skinG)" stroke-width="14" stroke-linecap="round"/>
-              <g id="${u}_rHand" transform="translate(252,340)"></g>
-            </g>
+                <!-- Current word label -->
+                <div id="${u}_word" style="
+                    font-size: 36px;
+                    font-weight: 800;
+                    color: #0F766E;
+                    text-transform: uppercase;
+                    letter-spacing: 2px;
+                    margin-top: 4px;
+                    text-shadow: 0 2px 4px rgba(0,0,0,0.08);
+                "></div>
 
-            <!-- ── LABEL ── -->
-            <rect id="${u}_lbBg" x="70" y="${this.H - 36}" width="200" height="28" rx="8"
-                  fill="rgba(13,148,136,0.92)" style="display:none"/>
-            <text id="${u}_lbTxt" x="170" y="${this.H - 16}" text-anchor="middle"
-                  font-size="13" font-weight="700" fill="white" font-family="Arial,sans-serif" style="display:none"></text>
-          </svg>
+                <!-- Description of the sign -->
+                <div id="${u}_desc" style="
+                    font-size: 14px;
+                    color: #64748B;
+                    font-style: italic;
+                    margin-top: 2px;
+                    min-height: 20px;
+                    max-width: 300px;
+                "></div>
+
+                <!-- Progress counter -->
+                <div id="${u}_counter" style="
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    width: 100%;
+                    margin-top: 8px;
+                    padding: 0 4px;
+                ">
+                    <span id="${u}_countText" style="font-size:12px;color:#94A3B8;font-weight:600;"></span>
+                    <span id="${u}_typeText" style="font-size:12px;color:#94A3B8;"></span>
+                </div>
+
+                <!-- Progress bar -->
+                <div style="width:100%;height:6px;background:#E2E8F0;border-radius:3px;overflow:hidden;">
+                    <div id="${u}_progbar" style="height:100%;width:0%;background:linear-gradient(90deg,#3B82F6,#0D9488);border-radius:3px;transition:width 0.3s ease;"></div>
+                </div>
+
+                <!-- Word strip (sentence progress) -->
+                <div id="${u}_strip" style="
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 6px;
+                    justify-content: center;
+                    margin-top: 10px;
+                    padding: 10px;
+                    background: rgba(255,255,255,0.75);
+                    border-radius: 12px;
+                    width: 100%;
+                    max-height: 80px;
+                    overflow-y: auto;
+                    border: 1px solid #E2E8F0;
+                "></div>
+
+                <!-- Replay/Stop controls -->
+                <div id="${u}_controls" style="display:flex;gap:8px;margin-top:10px;">
+                    <button id="${u}_stopBtn" onclick="window._signAvatar_${u}.cancel()" style="
+                        padding: 6px 16px;
+                        background: #FEE2E2;
+                        color: #DC2626;
+                        border: none;
+                        border-radius: 8px;
+                        font-size: 13px;
+                        font-weight: 600;
+                        cursor: pointer;
+                    ">⏹ Stop</button>
+                </div>
+            </div>
+
+            <!-- Done state -->
+            <div id="${u}_done" style="display:none;flex-direction:column;align-items:center;gap:10px;">
+                <div style="font-size:72px;line-height:1;">✅</div>
+                <div style="font-size:20px;font-weight:700;color:#059669;">Message Signed!</div>
+                <div id="${u}_fullmsg" style="font-size:15px;color:#475569;max-width:300px;word-wrap:break-word;line-height:1.5;"></div>
+                <!-- Replay button -->
+                <button id="${u}_replayBtn" onclick="window._signAvatar_${u}.replay()" style="
+                    padding: 8px 20px;
+                    background: #DBEAFE;
+                    color: #1E40AF;
+                    border: none;
+                    border-radius: 10px;
+                    font-size: 14px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    margin-top: 4px;
+                    transition: background 0.2s;
+                ">🔄 Replay</button>
+            </div>
         </div>`;
-        this._drawArms();
-        this._drawHand('l', 'relax', 0);
-        this._drawHand('r', 'relax', 0);
+
+        // Register on window for button onclick access
+        window[`_signAvatar_${u}`] = this;
     }
 
-    // ═══════════════ 2-BONE IK ═══════════════
-    _ik(shoulder, hand, upperLen, lowerLen, flipElbow) {
-        const dx = hand.x - shoulder.x;
-        const dy = hand.y - shoulder.y;
-        const dist = Math.hypot(dx, dy);
-        const maxReach = upperLen + lowerLen - 2;
-        const clampDist = Math.min(dist, maxReach);
-        const a = upperLen, b = lowerLen, c = clampDist;
-        let cosAngle = (a * a + c * c - b * b) / (2 * a * c);
-        cosAngle = Math.max(-1, Math.min(1, cosAngle));
-        const angle = Math.acos(cosAngle);
-        const baseAngle = Math.atan2(dy, dx);
-        const elbowAngle = flipElbow ? baseAngle - angle : baseAngle + angle;
-        return {
-            x: shoulder.x + Math.cos(elbowAngle) * upperLen,
-            y: shoulder.y + Math.sin(elbowAngle) * upperLen
-        };
-    }
-
-    _drawArms() {
-        const B = this.B;
-        const upperLen = 70, lowerLen = 75;
-        const lElbow = this._ik(B.lShoulder, this._lhCurrent, upperLen, lowerLen, false);
-        this._setPath(`${this.uid}_lArm`, `M${B.lShoulder.x},${B.lShoulder.y} Q${lElbow.x},${lElbow.y} ${lElbow.x},${lElbow.y}`);
-        this._setPath(`${this.uid}_lForearm`, `M${lElbow.x},${lElbow.y} L${this._lhCurrent.x},${this._lhCurrent.y}`);
-        const lh = document.getElementById(`${this.uid}_lHand`);
-        if (lh) lh.setAttribute('transform', `translate(${this._lhCurrent.x},${this._lhCurrent.y}) rotate(${this._lHandRot})`);
-        const rElbow = this._ik(B.rShoulder, this._rhCurrent, upperLen, lowerLen, true);
-        this._setPath(`${this.uid}_rArm`, `M${B.rShoulder.x},${B.rShoulder.y} Q${rElbow.x},${rElbow.y} ${rElbow.x},${rElbow.y}`);
-        this._setPath(`${this.uid}_rForearm`, `M${rElbow.x},${rElbow.y} L${this._rhCurrent.x},${this._rhCurrent.y}`);
-        const rh = document.getElementById(`${this.uid}_rHand`);
-        if (rh) rh.setAttribute('transform', `translate(${this._rhCurrent.x},${this._rhCurrent.y}) rotate(${this._rHandRot})`);
-    }
-
-    _setPath(id, d) { const el = document.getElementById(id); if (el) el.setAttribute('d', d); }
-
-    // ═══════════════ ANIMATION LOOP ═══════════════
-    _startAnimLoop() {
-        const step = () => {
-            if (this._interpT < 1) {
-                this._interpT = Math.min(1, this._interpT + 0.08);
-                const t = this._ease(this._interpT);
-                this._lhCurrent.x = this._lhStart.x + (this._lhTarget.x - this._lhStart.x) * t;
-                this._lhCurrent.y = this._lhStart.y + (this._lhTarget.y - this._lhStart.y) * t;
-                this._rhCurrent.x = this._rhStart.x + (this._rhTarget.x - this._rhStart.x) * t;
-                this._rhCurrent.y = this._rhStart.y + (this._rhTarget.y - this._rhStart.y) * t;
-                this._drawArms();
-            }
-            this._animId = requestAnimationFrame(step);
-        };
-        this._animId = requestAnimationFrame(step);
-    }
-
-    _ease(t) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; }
-
-    _moveHandsTo(lTarget, rTarget, lRot, rRot) {
-        this._lhStart = { ...this._lhCurrent };
-        this._rhStart = { ...this._rhCurrent };
-        this._lhTarget = lTarget ? { ...lTarget } : { ...this._lhCurrent };
-        this._rhTarget = rTarget ? { ...rTarget } : { ...this._rhCurrent };
-        if (lRot !== undefined && lRot !== null) this._lHandRot = lRot;
-        if (rRot !== undefined && rRot !== null) this._rHandRot = rRot;
-        this._interpT = 0;
-    }
-
-    // ═══════════════ HAND SHAPES ═══════════════
-    _drawHand(side, shape) {
-        const el = document.getElementById(`${this.uid}_${side}Hand`);
-        if (!el) return;
-        const sc = '#D4A574', hl = '#E8C4A0', sh = '#B8956A';
-        let svg = `<ellipse cx="0" cy="0" rx="10" ry="12" fill="${sc}" stroke="${sh}" stroke-width="0.6"/>`;
-        svg += `<ellipse cx="0" cy="1" rx="7" ry="9" fill="${hl}" opacity="0.25"/>`;
-        svg += this._getFingerPaths(shape);
-        el.innerHTML = svg;
-    }
-
-    _getFingerPaths(shape) {
-        let config;
-        switch(shape) {
-            case 'open':
-                config = [{a:-140,l:16,curl:0},{a:-100,l:18,curl:0},{a:-88,l:19,curl:0},{a:-76,l:17,curl:0},{a:-60,l:14,curl:0}]; break;
-            case 'fist':
-                config = [{a:-130,l:10,curl:0.9},{a:-100,l:12,curl:0.95},{a:-88,l:13,curl:0.95},{a:-76,l:12,curl:0.95},{a:-60,l:10,curl:0.95}]; break;
-            case 'point':
-                config = [{a:-135,l:10,curl:0.8},{a:-92,l:19,curl:0},{a:-80,l:13,curl:0.9},{a:-70,l:12,curl:0.9},{a:-58,l:10,curl:0.9}]; break;
-            case 'flat':
-                config = [{a:-120,l:14,curl:0.3},{a:-94,l:18,curl:0},{a:-88,l:19,curl:0},{a:-82,l:17,curl:0},{a:-76,l:14,curl:0}]; break;
-            case 'thumb_up':
-                config = [{a:-160,l:16,curl:0},{a:-95,l:12,curl:0.95},{a:-85,l:13,curl:0.95},{a:-75,l:12,curl:0.95},{a:-65,l:10,curl:0.95}]; break;
-            case 'peace':
-                config = [{a:-130,l:10,curl:0.85},{a:-100,l:18,curl:0},{a:-78,l:19,curl:0},{a:-68,l:12,curl:0.9},{a:-55,l:10,curl:0.9}]; break;
-            case 'claw':
-                config = [{a:-140,l:14,curl:0.45},{a:-105,l:16,curl:0.45},{a:-88,l:17,curl:0.45},{a:-72,l:15,curl:0.45},{a:-55,l:13,curl:0.45}]; break;
-            case 'ok':
-                config = [{a:-115,l:12,curl:0.7},{a:-105,l:12,curl:0.7},{a:-82,l:18,curl:0},{a:-72,l:16,curl:0},{a:-60,l:13,curl:0}]; break;
-            case 'pinch':
-                config = [{a:-110,l:13,curl:0.5},{a:-100,l:14,curl:0.5},{a:-85,l:14,curl:0.6},{a:-74,l:13,curl:0.65},{a:-62,l:11,curl:0.7}]; break;
-            case 'three':
-                config = [{a:-140,l:15,curl:0},{a:-100,l:18,curl:0},{a:-82,l:19,curl:0},{a:-70,l:12,curl:0.9},{a:-58,l:10,curl:0.9}]; break;
-            case 'four':
-                config = [{a:-135,l:10,curl:0.9},{a:-102,l:18,curl:0},{a:-90,l:19,curl:0},{a:-78,l:17,curl:0},{a:-64,l:14,curl:0}]; break;
-            case 'y_hand':
-                config = [{a:-145,l:16,curl:0},{a:-100,l:12,curl:0.9},{a:-88,l:13,curl:0.9},{a:-76,l:12,curl:0.9},{a:-58,l:14,curl:0}]; break;
-            case 'wave':
-                config = [{a:-145,l:15,curl:0},{a:-108,l:18,curl:0.05},{a:-90,l:19,curl:0.05},{a:-72,l:17,curl:0.05},{a:-55,l:14,curl:0.05}]; break;
-            default: // relax
-                config = [{a:-130,l:12,curl:0.5},{a:-98,l:14,curl:0.45},{a:-86,l:15,curl:0.45},{a:-74,l:14,curl:0.45},{a:-60,l:12,curl:0.5}];
-        }
-        return config.map((f, i) => this._drawFinger(f, i === 0)).join('');
-    }
-
-    _drawFinger(cfg, isThumb) {
-        const sc = '#D4A574', jc = '#C49060';
-        const rad = cfg.a * Math.PI / 180;
-        const w = isThumb ? 5 : 3.5;
-        const segs = isThumb ? 2 : 3;
-        const segLen = cfg.l / segs;
-        let pts = [{ x: 0, y: 0 }];
-        let curAngle = rad;
-        const curlPerSeg = cfg.curl * 0.6;
-        for (let s = 0; s < segs; s++) {
-            const prev = pts[pts.length - 1];
-            curAngle += curlPerSeg;
-            pts.push({ x: prev.x + Math.cos(curAngle) * segLen, y: prev.y + Math.sin(curAngle) * segLen });
-        }
-        let svg = '';
-        for (let s = 0; s < pts.length - 1; s++) {
-            const p1 = pts[s], p2 = pts[s + 1];
-            const sw = w - s * (isThumb ? 0.8 : 0.5);
-            svg += `<line x1="${p1.x.toFixed(1)}" y1="${p1.y.toFixed(1)}" x2="${p2.x.toFixed(1)}" y2="${p2.y.toFixed(1)}" stroke="${sc}" stroke-width="${sw}" stroke-linecap="round"/>`;
-            if (s > 0) svg += `<circle cx="${p1.x.toFixed(1)}" cy="${p1.y.toFixed(1)}" r="${sw*0.35}" fill="${jc}" opacity="0.4"/>`;
-        }
-        const tip = pts[pts.length - 1];
-        svg += `<circle cx="${tip.x.toFixed(1)}" cy="${tip.y.toFixed(1)}" r="${(w - segs * 0.5) * 0.45}" fill="${sc}"/>`;
-        const prev = pts[pts.length - 2];
-        const na = Math.atan2(tip.y - prev.y, tip.x - prev.x);
-        svg += `<circle cx="${(tip.x + Math.cos(na)).toFixed(1)}" cy="${(tip.y + Math.sin(na)).toFixed(1)}" r="1.6" fill="#F0D5C0" stroke="#DBBFA8" stroke-width="0.3"/>`;
-        return svg;
-    }
-
-    // ═══════════════ EXPRESSIONS ═══════════════
-    _setExpression(expr) {
-        const u = this.uid;
-        const mouth = document.getElementById(`${u}_mouth`);
-        const lB = document.getElementById(`${u}_lBrow`);
-        const rB = document.getElementById(`${u}_rBrow`);
-        if (!mouth) return;
-        switch (expr) {
-            case 'happy':
-                mouth.setAttribute('d', 'M155,141 Q162,151 170,153 Q178,151 185,141');
-                if (lB) lB.setAttribute('d', 'M139,86 Q148,81 161,86');
-                if (rB) rB.setAttribute('d', 'M179,86 Q192,81 201,86');
-                break;
-            case 'concerned':
-                mouth.setAttribute('d', 'M158,147 Q164,143 170,142 Q176,143 182,147');
-                if (lB) lB.setAttribute('d', 'M139,84 Q148,86 161,90');
-                if (rB) rB.setAttribute('d', 'M179,90 Q192,86 201,84');
-                break;
-            case 'thinking':
-                mouth.setAttribute('d', 'M160,145 Q165,143 170,144 Q175,143 180,145');
-                if (lB) lB.setAttribute('d', 'M139,85 Q148,82 161,88');
-                if (rB) rB.setAttribute('d', 'M179,87 Q192,82 201,86');
-                break;
-            default:
-                mouth.setAttribute('d', 'M155,143 Q162,149 170,150 Q178,149 185,143');
-                if (lB) lB.setAttribute('d', 'M139,88 Q148,82 161,87');
-                if (rB) rB.setAttribute('d', 'M179,87 Q192,82 201,88');
-        }
-    }
-
-    // ═══════════════ LABEL ═══════════════
-    _showLabel(text) {
-        const bg = document.getElementById(`${this.uid}_lbBg`);
-        const txt = document.getElementById(`${this.uid}_lbTxt`);
-        if (bg) bg.style.display = 'block';
-        if (txt) { txt.style.display = 'block'; txt.textContent = text; }
-    }
-    _hideLabel() {
-        const bg = document.getElementById(`${this.uid}_lbBg`);
-        const txt = document.getElementById(`${this.uid}_lbTxt`);
-        if (bg) bg.style.display = 'none';
-        if (txt) txt.style.display = 'none';
-    }
-
-    // ═══════════════ SIGN POSES ═══════════════
-    // Each sign = hand positions relative to body, hand shapes, rotation, expression, optional secondary motion
-    static SIGNS = {
-        // Greetings
-        'hello':   { rPos:{x:215,y:85},  lPos:null, rShape:'open',  lShape:'relax', rRot:-10, expression:'happy',    label:'Hello',    motion:'wave_away' },
-        'hi':      { rPos:{x:215,y:85},  lPos:null, rShape:'open',  lShape:'relax', rRot:-10, expression:'happy',    label:'Hi',       motion:'wave_away' },
-        'goodbye': { rPos:{x:230,y:100}, lPos:null, rShape:'wave',  lShape:'relax', rRot:0,   expression:'happy',    label:'Goodbye',  motion:'wave_side' },
-        'welcome': { rPos:{x:230,y:200}, lPos:{x:110,y:200}, rShape:'open', lShape:'open', rRot:20, lRot:-20, expression:'happy', label:'Welcome' },
-        // Yes / No
-        'yes':  { rPos:{x:230,y:180}, lPos:null, rShape:'fist',  lShape:'relax', rRot:0,  expression:'happy',    label:'Yes',   motion:'nod_fist' },
-        'no':   { rPos:{x:220,y:160}, lPos:null, rShape:'pinch', lShape:'relax', rRot:0,  expression:'concerned',label:'No',    motion:'pinch_close' },
-        // Common
-        'please': { rPos:{x:190,y:230}, lPos:null, rShape:'flat',  lShape:'relax', rRot:0,   expression:'happy',    label:'Please', motion:'circle_chest' },
-        'thank':  { rPos:{x:185,y:140}, lPos:null, rShape:'flat',  lShape:'relax', rRot:-15, expression:'happy',    label:'Thank you', motion:'chin_forward' },
-        'thanks': { rPos:{x:185,y:140}, lPos:null, rShape:'flat',  lShape:'relax', rRot:-15, expression:'happy',    label:'Thank you', motion:'chin_forward' },
-        'sorry':  { rPos:{x:190,y:240}, lPos:null, rShape:'fist',  lShape:'relax', rRot:0,   expression:'concerned',label:'Sorry',  motion:'circle_chest' },
-        'ok':     { rPos:{x:230,y:180}, lPos:null, rShape:'ok',    lShape:'relax', rRot:0,   expression:'happy',    label:'OK' },
-        'good':   { rPos:{x:185,y:140}, lPos:{x:155,y:250}, rShape:'flat', lShape:'flat', rRot:-20, lRot:20, expression:'happy', label:'Good', motion:'chin_to_palm' },
-        // Questions
-        'what':  { rPos:{x:220,y:200}, lPos:{x:120,y:200}, rShape:'open', lShape:'open', rRot:15, lRot:-15, expression:'thinking', label:'What?' },
-        'where': { rPos:{x:230,y:160}, lPos:null, rShape:'point', lShape:'relax', rRot:0,  expression:'thinking', label:'Where?', motion:'wag' },
-        'when':  { rPos:{x:220,y:170}, lPos:{x:140,y:170}, rShape:'point', lShape:'point', rRot:-10, lRot:10, expression:'thinking', label:'When?' },
-        'how':   { rPos:{x:230,y:200}, lPos:{x:110,y:200}, rShape:'fist', lShape:'fist', rRot:30, lRot:-30, expression:'thinking', label:'How?' },
-        'why':   { rPos:{x:200,y:80},  lPos:null, rShape:'y_hand', lShape:'relax', rRot:0, expression:'thinking', label:'Why?' },
-        // Pronouns
-        'i':    { rPos:{x:195,y:230}, lPos:null, rShape:'point', lShape:'relax', rRot:160, expression:'neutral', label:'I / Me' },
-        'me':   { rPos:{x:195,y:230}, lPos:null, rShape:'point', lShape:'relax', rRot:160, expression:'neutral', label:'Me' },
-        'you':  { rPos:{x:240,y:190}, lPos:null, rShape:'point', lShape:'relax', rRot:0,   expression:'neutral', label:'You' },
-        'your': { rPos:{x:240,y:190}, lPos:null, rShape:'flat',  lShape:'relax', rRot:0,   expression:'neutral', label:'Your' },
-        'we':   { rPos:{x:195,y:210}, lPos:null, rShape:'point', lShape:'relax', rRot:120, expression:'happy',   label:'We', motion:'sweep_lr' },
-        'this': { rPos:{x:200,y:260}, lPos:null, rShape:'point', lShape:'relax', rRot:90,  expression:'neutral', label:'This' },
-        // Body parts
-        'head':     { rPos:{x:195,y:80},  lPos:null, rShape:'flat',  lShape:'relax', rRot:0, expression:'neutral',  label:'Head' },
-        'headache': { rPos:{x:200,y:80},  lPos:{x:140,y:80}, rShape:'claw', lShape:'claw', rRot:0, lRot:0, expression:'concerned', label:'Headache' },
-        'eye':      { rPos:{x:195,y:100}, lPos:null, rShape:'point', lShape:'relax', rRot:-30, expression:'neutral', label:'Eye' },
-        'ear':      { rPos:{x:215,y:100}, lPos:null, rShape:'point', lShape:'relax', rRot:0,   expression:'neutral', label:'Ear' },
-        'mouth':    { rPos:{x:195,y:140}, lPos:null, rShape:'point', lShape:'relax', rRot:-20, expression:'neutral', label:'Mouth' },
-        'throat':   { rPos:{x:190,y:158}, lPos:null, rShape:'claw',  lShape:'relax', rRot:0,   expression:'concerned',label:'Throat' },
-        'chest':    { rPos:{x:195,y:225}, lPos:null, rShape:'flat',  lShape:'relax', rRot:0,   expression:'neutral', label:'Chest' },
-        'heart':    { rPos:{x:155,y:225}, lPos:null, rShape:'fist',  lShape:'relax', rRot:0,   expression:'concerned',label:'Heart', motion:'tap' },
-        'stomach':  { rPos:{x:185,y:295}, lPos:null, rShape:'flat',  lShape:'relax', rRot:0,   expression:'concerned',label:'Stomach', motion:'circle_body' },
-        'back':     { rPos:{x:130,y:260}, lPos:null, rShape:'flat',  lShape:'relax', rRot:30,  expression:'concerned',label:'Back' },
-        'arm':      { rPos:{x:130,y:220}, lPos:null, rShape:'flat',  lShape:'relax', rRot:0,   expression:'neutral', label:'Arm', motion:'slide' },
-        'leg':      { rPos:{x:200,y:370}, lPos:null, rShape:'flat',  lShape:'relax', rRot:90,  expression:'neutral', label:'Leg' },
-        'hand':     { rPos:{x:155,y:280}, lPos:{x:155,y:280}, rShape:'flat', lShape:'open', rRot:0, lRot:0, expression:'neutral', label:'Hand' },
-        // Symptoms
-        'pain':    { rPos:{x:210,y:220}, lPos:{x:130,y:220}, rShape:'point', lShape:'point', rRot:160, lRot:20, expression:'concerned', label:'Pain', motion:'twist' },
-        'hurt':    { rPos:{x:210,y:220}, lPos:{x:130,y:220}, rShape:'point', lShape:'point', rRot:160, lRot:20, expression:'concerned', label:'Hurt', motion:'twist' },
-        'sick':    { rPos:{x:195,y:85},  lPos:{x:155,y:290}, rShape:'claw', lShape:'claw', rRot:0, lRot:0, expression:'concerned', label:'Sick' },
-        'fever':   { rPos:{x:195,y:75},  lPos:null, rShape:'flat',  lShape:'relax', rRot:-10, expression:'concerned',label:'Fever' },
-        'dizzy':   { rPos:{x:200,y:80},  lPos:null, rShape:'claw',  lShape:'relax', rRot:0,   expression:'concerned',label:'Dizzy', motion:'circle_head' },
-        'blood':   { rPos:{x:210,y:230}, lPos:{x:140,y:200}, rShape:'claw', lShape:'fist', rRot:45, lRot:0, expression:'concerned', label:'Blood' },
-        'breathe': { rPos:{x:195,y:240}, lPos:{x:145,y:240}, rShape:'open', lShape:'open', rRot:0, lRot:0, expression:'concerned', label:'Breathe', motion:'breathe' },
-        'cough':   { rPos:{x:185,y:155}, lPos:null, rShape:'fist',  lShape:'relax', rRot:0,   expression:'concerned',label:'Cough' },
-        'vomit':   { rPos:{x:195,y:140}, lPos:null, rShape:'claw',  lShape:'relax', rRot:0,   expression:'concerned',label:'Vomit' },
-        'tired':   { rPos:{x:195,y:230}, lPos:{x:145,y:230}, rShape:'open', lShape:'open', rRot:30, lRot:-30, expression:'concerned', label:'Tired' },
-        'swollen': { rPos:{x:220,y:210}, lPos:{x:120,y:210}, rShape:'claw', lShape:'claw', rRot:20, lRot:-20, expression:'concerned', label:'Swollen' },
-        // Treatment
-        'medicine':    { rPos:{x:200,y:250}, lPos:{x:145,y:260}, rShape:'point', lShape:'flat', rRot:0, lRot:30, expression:'neutral', label:'Medicine', motion:'tap' },
-        'medication':  { rPos:{x:200,y:250}, lPos:{x:145,y:260}, rShape:'point', lShape:'flat', rRot:0, lRot:30, expression:'neutral', label:'Medication', motion:'tap' },
-        'doctor':      { rPos:{x:200,y:250}, lPos:{x:146,y:200}, rShape:'flat', lShape:'flat', rRot:-20, lRot:20, expression:'neutral', label:'Doctor', motion:'tap' },
-        'nurse':       { rPos:{x:200,y:200}, lPos:null, rShape:'peace', lShape:'relax', rRot:-10, expression:'neutral', label:'Nurse' },
-        'hospital':    { rPos:{x:215,y:185}, lPos:null, rShape:'point', lShape:'relax', rRot:-30, expression:'neutral', label:'Hospital', motion:'h_cross' },
-        'help':        { rPos:{x:200,y:200}, lPos:{x:145,y:260}, rShape:'thumb_up', lShape:'flat', rRot:0, lRot:30, expression:'concerned', label:'Help' },
-        'water':       { rPos:{x:195,y:140}, lPos:null, rShape:'three', lShape:'relax', rRot:0, expression:'neutral', label:'Water', motion:'tap' },
-        'food':        { rPos:{x:195,y:140}, lPos:null, rShape:'pinch', lShape:'relax', rRot:0, expression:'neutral', label:'Food', motion:'tap' },
-        'eat':         { rPos:{x:195,y:140}, lPos:null, rShape:'pinch', lShape:'relax', rRot:0, expression:'neutral', label:'Eat', motion:'tap' },
-        'sleep':       { rPos:{x:195,y:115}, lPos:null, rShape:'open',  lShape:'relax', rRot:-20, expression:'neutral', label:'Sleep' },
-        'injection':   { rPos:{x:200,y:210}, lPos:{x:130,y:215}, rShape:'fist', lShape:'flat', rRot:-30, lRot:0, expression:'concerned', label:'Injection' },
-        'test':        { rPos:{x:200,y:240}, lPos:{x:145,y:250}, rShape:'point', lShape:'flat', rRot:0, lRot:30, expression:'neutral', label:'Test' },
-        'xray':        { rPos:{x:220,y:230}, lPos:{x:120,y:230}, rShape:'open', lShape:'open', rRot:10, lRot:-10, expression:'neutral', label:'X-Ray' },
-        'prescription':{ rPos:{x:210,y:250}, lPos:{x:140,y:260}, rShape:'point', lShape:'flat', rRot:0, lRot:25, expression:'neutral', label:'Prescription', motion:'write' },
-        'appointment': { rPos:{x:210,y:240}, lPos:{x:140,y:250}, rShape:'fist', lShape:'flat', rRot:0, lRot:20, expression:'neutral', label:'Appointment', motion:'circle_palm' },
-        // Verbs
-        'take':  { rPos:{x:240,y:210}, lPos:null, rShape:'claw',  lShape:'relax', rRot:0,   expression:'neutral', label:'Take',  motion:'grab_in' },
-        'give':  { rPos:{x:250,y:220}, lPos:null, rShape:'open',  lShape:'relax', rRot:10,  expression:'happy',   label:'Give' },
-        'wait':  { rPos:{x:225,y:210}, lPos:{x:115,y:210}, rShape:'open', lShape:'open', rRot:15, lRot:-15, expression:'neutral', label:'Wait' },
-        'come':  { rPos:{x:240,y:190}, lPos:null, rShape:'point', lShape:'relax', rRot:-30, expression:'happy',   label:'Come',  motion:'beckon' },
-        'go':    { rPos:{x:250,y:190}, lPos:null, rShape:'point', lShape:'relax', rRot:10,  expression:'neutral', label:'Go' },
-        'stop':  { rPos:{x:240,y:170}, lPos:null, rShape:'flat',  lShape:'relax', rRot:0,   expression:'concerned',label:'Stop' },
-        'feel':  { rPos:{x:185,y:235}, lPos:null, rShape:'point', lShape:'relax', rRot:180, expression:'neutral', label:'Feel',  motion:'tap' },
-        'need':  { rPos:{x:225,y:210}, lPos:null, rShape:'claw',  lShape:'relax', rRot:30,  expression:'concerned',label:'Need',  motion:'pull_down' },
-        'want':  { rPos:{x:220,y:210}, lPos:{x:120,y:210}, rShape:'claw', lShape:'claw', rRot:20, lRot:-20, expression:'neutral', label:'Want' },
-        'understand': { rPos:{x:210,y:85}, lPos:null, rShape:'point', lShape:'relax', rRot:-30, expression:'happy', label:'Understand', motion:'flick_up' },
-        'know':  { rPos:{x:200,y:80},  lPos:null, rShape:'flat',  lShape:'relax', rRot:-10, expression:'neutral', label:'Know' },
-        'see':   { rPos:{x:200,y:100}, lPos:null, rShape:'peace', lShape:'relax', rRot:0,   expression:'neutral', label:'See' },
-        'hear':  { rPos:{x:210,y:100}, lPos:null, rShape:'claw',  lShape:'relax', rRot:0,   expression:'neutral', label:'Hear' },
-        'think': { rPos:{x:200,y:85},  lPos:null, rShape:'point', lShape:'relax', rRot:-20, expression:'thinking',label:'Think' },
-        'have':  { rPos:{x:195,y:230}, lPos:null, rShape:'flat',  lShape:'relax', rRot:0,   expression:'neutral', label:'Have' },
-        'can':   { rPos:{x:225,y:210}, lPos:{x:115,y:210}, rShape:'fist', lShape:'fist', rRot:0, lRot:0, expression:'neutral', label:'Can' },
-        'not':   { rPos:{x:200,y:150}, lPos:null, rShape:'flat',  lShape:'relax', rRot:0,   expression:'concerned',label:'Not',   motion:'chin_forward' },
-        "don't": { rPos:{x:200,y:150}, lPos:null, rShape:'flat',  lShape:'relax', rRot:0,   expression:'concerned',label:"Don't", motion:'chin_forward' },
-        // Time
-        'today':    { rPos:{x:220,y:210}, lPos:{x:120,y:210}, rShape:'flat', lShape:'flat', rRot:15, lRot:-15, expression:'neutral', label:'Today' },
-        'tomorrow': { rPos:{x:205,y:95},  lPos:null, rShape:'thumb_up', lShape:'relax', rRot:0, expression:'neutral', label:'Tomorrow' },
-        'morning':  { rPos:{x:230,y:175}, lPos:{x:130,y:240}, rShape:'flat', lShape:'flat', rRot:-20, lRot:10, expression:'happy', label:'Morning' },
-        'night':    { rPos:{x:220,y:200}, lPos:{x:130,y:230}, rShape:'flat', lShape:'flat', rRot:30, lRot:15, expression:'neutral', label:'Night' },
-        'time':     { rPos:{x:200,y:200}, lPos:{x:146,y:200}, rShape:'point', lShape:'flat', rRot:-20, lRot:20, expression:'neutral', label:'Time', motion:'tap' },
-        'day':      { rPos:{x:230,y:170}, lPos:{x:130,y:240}, rShape:'flat', lShape:'flat', rRot:-30, lRot:10, expression:'neutral', label:'Day' },
-        'week':     { rPos:{x:210,y:240}, lPos:{x:140,y:250}, rShape:'point', lShape:'flat', rRot:0, lRot:25, expression:'neutral', label:'Week', motion:'slide' },
-        'minute':   { rPos:{x:210,y:240}, lPos:{x:146,y:200}, rShape:'point', lShape:'flat', rRot:0, lRot:20, expression:'neutral', label:'Minute' },
-        // Numbers
-        'one':   { rPos:{x:230,y:175}, lPos:null, rShape:'point', lShape:'relax', rRot:0, expression:'neutral', label:'1' },
-        'two':   { rPos:{x:230,y:175}, lPos:null, rShape:'peace', lShape:'relax', rRot:0, expression:'neutral', label:'2' },
-        'three': { rPos:{x:230,y:175}, lPos:null, rShape:'three', lShape:'relax', rRot:0, expression:'neutral', label:'3' },
-        'four':  { rPos:{x:230,y:175}, lPos:null, rShape:'four',  lShape:'relax', rRot:0, expression:'neutral', label:'4' },
-        'five':  { rPos:{x:230,y:175}, lPos:null, rShape:'open',  lShape:'relax', rRot:0, expression:'neutral', label:'5' },
-        // Adjectives
-        'big':    { rPos:{x:245,y:195}, lPos:{x:95,y:195},  rShape:'open', lShape:'open', rRot:15, lRot:-15, expression:'neutral', label:'Big' },
-        'small':  { rPos:{x:200,y:210}, lPos:{x:140,y:210}, rShape:'flat', lShape:'flat', rRot:0, lRot:0, expression:'neutral', label:'Small' },
-        'hot':    { rPos:{x:200,y:140}, lPos:null, rShape:'claw', lShape:'relax', rRot:0, expression:'concerned', label:'Hot' },
-        'cold':   { rPos:{x:210,y:215}, lPos:{x:130,y:215}, rShape:'fist', lShape:'fist', rRot:0, lRot:0, expression:'concerned', label:'Cold', motion:'shiver' },
-        'better': { rPos:{x:195,y:140}, lPos:null, rShape:'flat', lShape:'relax', rRot:-15, expression:'happy', label:'Better' },
-        'worse':  { rPos:{x:200,y:250}, lPos:null, rShape:'claw', lShape:'relax', rRot:30, expression:'concerned', label:'Worse' },
-        // Special
-        'allergy':     { rPos:{x:195,y:125}, lPos:null, rShape:'point', lShape:'relax', rRot:-15, expression:'concerned', label:'Allergy' },
-        'allergic':    { rPos:{x:195,y:125}, lPos:null, rShape:'point', lShape:'relax', rRot:-15, expression:'concerned', label:'Allergic' },
-        'temperature': { rPos:{x:195,y:75},  lPos:null, rShape:'flat',  lShape:'relax', rRot:-10, expression:'concerned', label:'Temperature' },
+    /* ═══════════════════════════════════════════════════════════════
+       ASL FINGERSPELLING ALPHABET (from Hackathon reference)
+       Correct hand-shape emojis + descriptions per letter
+       ═══════════════════════════════════════════════════════════════ */
+    static ASL_ALPHA = {
+        'A': { emoji: '✊',  desc: 'Fist with thumb to the side' },
+        'B': { emoji: '🖐', desc: 'Flat hand, fingers together, thumb tucked' },
+        'C': { emoji: '🤏', desc: 'Curved hand like holding a cup' },
+        'D': { emoji: '☝️',  desc: 'Index finger up, others touch thumb' },
+        'E': { emoji: '✊',  desc: 'Fingers curled, thumb tucked under' },
+        'F': { emoji: '👌', desc: 'Thumb and index touch, others up' },
+        'G': { emoji: '👈', desc: 'Index and thumb pointing sideways' },
+        'H': { emoji: '🤞', desc: 'Index and middle finger sideways' },
+        'I': { emoji: '🤙', desc: 'Pinky up, others closed' },
+        'J': { emoji: '🤙', desc: 'Pinky up with J motion downward' },
+        'K': { emoji: '✌️',  desc: 'Index and middle up, thumb between' },
+        'L': { emoji: '🤟', desc: 'L shape — index up, thumb out' },
+        'M': { emoji: '✊',  desc: 'Thumb under three fingers' },
+        'N': { emoji: '✊',  desc: 'Thumb under two fingers' },
+        'O': { emoji: '👌', desc: 'All fingers touch thumb in O shape' },
+        'P': { emoji: '👇', desc: 'Like K but pointing down' },
+        'Q': { emoji: '👇', desc: 'Like G but pointing down' },
+        'R': { emoji: '🤞', desc: 'Crossed index and middle fingers' },
+        'S': { emoji: '✊',  desc: 'Fist with thumb over fingers' },
+        'T': { emoji: '✊',  desc: 'Thumb between index and middle' },
+        'U': { emoji: '✌️',  desc: 'Index and middle together, up' },
+        'V': { emoji: '✌️',  desc: 'Index and middle spread apart' },
+        'W': { emoji: '🤟', desc: 'Three middle fingers up' },
+        'X': { emoji: '☝️',  desc: 'Index finger hooked' },
+        'Y': { emoji: '🤙', desc: 'Thumb and pinky out — Y shape' },
+        'Z': { emoji: '☝️',  desc: 'Index finger draws Z in air' },
     };
 
-    // Words to skip
+    /* ═══════════════════════════════════════════════════════════════
+       EMOJI SIGN DICTIONARY — 180+ words with per-sign durations
+       duration: ms to show each sign (default 800)
+       ═══════════════════════════════════════════════════════════════ */
+    static SIGNS = {
+        // Greetings
+        'hello':    { emoji: '👋', label: 'Hello', desc: 'Wave hand near forehead', duration: 1200 },
+        'hi':       { emoji: '👋', label: 'Hi', desc: 'Wave hand', duration: 800 },
+        'goodbye':  { emoji: '👋', label: 'Goodbye', desc: 'Open-close hand wave', duration: 1200 },
+        'bye':      { emoji: '👋', label: 'Bye', desc: 'Wave goodbye', duration: 800 },
+        'welcome':  { emoji: '🤗', label: 'Welcome', desc: 'Open arms welcome', duration: 1000 },
+        'yes':      { emoji: '👍', label: 'Yes', desc: 'Fist nods up and down', duration: 800 },
+        'no':       { emoji: '✊', label: 'No', desc: 'Index and middle finger snap to thumb', duration: 800 },
+        'please':   { emoji: '🙏', label: 'Please', desc: 'Flat hand circles on chest', duration: 1000 },
+        'thank':    { emoji: '🙏', label: 'Thank You', desc: 'Flat hand from chin forward', duration: 1000 },
+        'thanks':   { emoji: '🙏', label: 'Thank You', desc: 'Flat hand from chin forward', duration: 800 },
+        'sorry':    { emoji: '😔', label: 'Sorry', desc: 'Fist circles on chest', duration: 1000 },
+        'ok':       { emoji: '👌', label: 'OK', desc: 'OK hand sign', duration: 600 },
+        'good':     { emoji: '👍', label: 'Good', desc: 'Flat hand from chin outward', duration: 800 },
+
+        // Questions
+        'what':     { emoji: '🤷', label: 'What?', desc: 'Palms up, shake side to side', duration: 800 },
+        'where':    { emoji: '👉❓', label: 'Where?', desc: 'Index finger waves side to side', duration: 800 },
+        'when':     { emoji: '⏰❓', label: 'When?', desc: 'Index circles then touches other index', duration: 1000 },
+        'how':      { emoji: '🤔', label: 'How?', desc: 'Knuckles together, roll forward, palms up', duration: 1000 },
+        'why':      { emoji: '🤨❓', label: 'Why?', desc: 'Touch forehead, pull away into Y shape', duration: 1000 },
+        'which':    { emoji: '👆↔️', label: 'Which?', desc: 'Alternating hands — choose', duration: 800 },
+        'who':      { emoji: '🫵❓', label: 'Who?', desc: 'Point and circle — person', duration: 800 },
+
+        // Pronouns
+        'i':     { emoji: '👈', label: 'I / Me', desc: 'Point to self (chest)', duration: 500 },
+        'me':    { emoji: '👈', label: 'Me', desc: 'Point to self', duration: 600 },
+        'you':   { emoji: '👉', label: 'You', desc: 'Point index finger forward', duration: 600 },
+        'your':  { emoji: '👉', label: 'Your', desc: 'Flat hand pushes forward', duration: 600 },
+        'we':    { emoji: '👥', label: 'We', desc: 'Point between self and others', duration: 800 },
+        'they':  { emoji: '👥', label: 'They', desc: 'Point side to side', duration: 800 },
+        'he':    { emoji: '👉', label: 'He', desc: 'Point to side', duration: 500 },
+        'she':   { emoji: '👉', label: 'She', desc: 'Point to side', duration: 500 },
+        'this':  { emoji: '👇', label: 'This', desc: 'Point down — here', duration: 600 },
+
+        // Body parts
+        'head':     { emoji: '🧠', label: 'Head', desc: 'Touch side of head', duration: 800 },
+        'headache': { emoji: '🤕', label: 'Headache', desc: 'Claw hands squeeze at temples', duration: 1000 },
+        'eye':      { emoji: '👁️', label: 'Eye', desc: 'Point to eye', duration: 600 },
+        'eyes':     { emoji: '👁️', label: 'Eyes', desc: 'Point to both eyes', duration: 600 },
+        'ear':      { emoji: '👂', label: 'Ear', desc: 'Point to ear', duration: 600 },
+        'mouth':    { emoji: '👄', label: 'Mouth', desc: 'Point to mouth', duration: 600 },
+        'throat':   { emoji: '🫁', label: 'Throat', desc: 'Claw hand at throat', duration: 800 },
+        'neck':     { emoji: '🤚', label: 'Neck', desc: 'Hand circles neck area', duration: 800 },
+        'chest':    { emoji: '🫁', label: 'Chest', desc: 'Flat hand on chest', duration: 800 },
+        'heart':    { emoji: '❤️', label: 'Heart', desc: 'Middle finger taps over heart', duration: 1000 },
+        'lung':     { emoji: '🫁', label: 'Lung', desc: 'Hands on ribcage', duration: 800 },
+        'lungs':    { emoji: '🫁', label: 'Lungs', desc: 'Hands expand on ribcage', duration: 800 },
+        'stomach':  { emoji: '🤢', label: 'Stomach', desc: 'Flat hand circles belly', duration: 800 },
+        'belly':    { emoji: '🤢', label: 'Belly', desc: 'Hand on belly', duration: 800 },
+        'back':     { emoji: '🔙', label: 'Back', desc: 'Hand reaches behind to back', duration: 800 },
+        'spine':    { emoji: '🔙', label: 'Spine', desc: 'Trace down back', duration: 800 },
+        'arm':      { emoji: '💪', label: 'Arm', desc: 'Slide hand along arm', duration: 800 },
+        'leg':      { emoji: '🦵', label: 'Leg', desc: 'Flat hand on thigh', duration: 800 },
+        'knee':     { emoji: '🦵', label: 'Knee', desc: 'Point to knee', duration: 600 },
+        'hand':     { emoji: '✋', label: 'Hand', desc: 'Show open hand', duration: 600 },
+        'finger':   { emoji: '☝️', label: 'Finger', desc: 'Point to finger', duration: 600 },
+        'foot':     { emoji: '🦶', label: 'Foot', desc: 'Point to foot', duration: 600 },
+        'skin':     { emoji: '🤚', label: 'Skin', desc: 'Pinch and pull forearm skin', duration: 800 },
+        'bone':     { emoji: '🦴', label: 'Bone', desc: 'Cross-arm tap on bone', duration: 800 },
+        'teeth':    { emoji: '🦷', label: 'Teeth', desc: 'Point to teeth', duration: 600 },
+        'tooth':    { emoji: '🦷', label: 'Tooth', desc: 'Point to tooth', duration: 600 },
+        'nose':     { emoji: '👃', label: 'Nose', desc: 'Point to nose', duration: 600 },
+        'tongue':   { emoji: '👅', label: 'Tongue', desc: 'Point to tongue', duration: 600 },
+        'brain':    { emoji: '🧠', label: 'Brain', desc: 'Tap side of head', duration: 800 },
+        'shoulder': { emoji: '💪', label: 'Shoulder', desc: 'Touch shoulder', duration: 600 },
+        'hip':      { emoji: '🦵', label: 'Hip', desc: 'Touch hip area', duration: 600 },
+        'wrist':    { emoji: '⌚', label: 'Wrist', desc: 'Touch wrist', duration: 600 },
+        'elbow':    { emoji: '💪', label: 'Elbow', desc: 'Touch elbow', duration: 600 },
+        'muscle':   { emoji: '💪', label: 'Muscle', desc: 'Flex arm — muscle', duration: 800 },
+
+        // Symptoms & conditions
+        'pain':     { emoji: '😣', label: 'Pain', desc: 'Index fingers twist toward each other', duration: 1000 },
+        'hurt':     { emoji: '😣', label: 'Hurt', desc: 'Index fingers twist — hurting', duration: 1000 },
+        'hurts':    { emoji: '😣', label: 'Hurts', desc: 'Index fingers twist — hurting', duration: 1000 },
+        'ache':     { emoji: '😣', label: 'Ache', desc: 'Pressing motion — deep ache', duration: 1000 },
+        'sick':     { emoji: '🤒', label: 'Sick', desc: 'Middle fingers on head & stomach', duration: 1000 },
+        'ill':      { emoji: '🤒', label: 'Ill', desc: 'Middle fingers on head & stomach', duration: 1000 },
+        'fever':    { emoji: '🌡️', label: 'Fever', desc: 'Hand on forehead — temperature', duration: 1000 },
+        'dizzy':    { emoji: '😵‍💫', label: 'Dizzy', desc: 'Claw circles near head', duration: 1000 },
+        'blood':    { emoji: '🩸', label: 'Blood', desc: 'Claw drips from fist — blood flow', duration: 1000 },
+        'breathe':  { emoji: '😮‍💨', label: 'Breathe', desc: 'Hands rise and fall from chest', duration: 1200 },
+        'breathing':{ emoji: '😮‍💨', label: 'Breathing', desc: 'Hands rise and fall from chest', duration: 1200 },
+        'cough':    { emoji: '🤧', label: 'Cough', desc: 'Fist pounds at chest', duration: 800 },
+        'vomit':    { emoji: '🤮', label: 'Vomit', desc: 'Claw from mouth outward', duration: 1000 },
+        'nausea':   { emoji: '🤢', label: 'Nausea', desc: 'Hand circles stomach — queasy', duration: 1000 },
+        'tired':    { emoji: '😩', label: 'Tired', desc: 'Hands drop on chest — exhausted', duration: 1000 },
+        'exhausted':{ emoji: '😩', label: 'Exhausted', desc: 'Both hands drop — very tired', duration: 1000 },
+        'swollen':  { emoji: '🎈', label: 'Swollen', desc: 'Claws expand outward — swelling', duration: 1000 },
+        'swelling': { emoji: '🎈', label: 'Swelling', desc: 'Hands expand — swelling up', duration: 1000 },
+        'rash':     { emoji: '🔴', label: 'Rash', desc: 'Tap dots on skin — red spots', duration: 800 },
+        'itch':     { emoji: '🤏', label: 'Itch', desc: 'Scratch motion on arm', duration: 800 },
+        'itchy':    { emoji: '🤏', label: 'Itchy', desc: 'Scratch motion on skin', duration: 800 },
+        'burn':     { emoji: '🔥', label: 'Burn', desc: 'Wiggle fingers upward — flame', duration: 800 },
+        'bleeding': { emoji: '🩸', label: 'Bleeding', desc: 'Blood dripping motion from hand', duration: 1000 },
+        'infection':{ emoji: '🦠', label: 'Infection', desc: 'Spread fingers outward — germs spread', duration: 1000 },
+        'infected': { emoji: '🦠', label: 'Infected', desc: 'Spread from point — infection', duration: 1000 },
+        'broken':   { emoji: '💔', label: 'Broken', desc: 'Snap hands apart — break', duration: 1000 },
+        'fracture': { emoji: '💔', label: 'Fracture', desc: 'Break motion — snap', duration: 1000 },
+        'pregnant': { emoji: '🤰', label: 'Pregnant', desc: 'Hand arcs outward from belly', duration: 1200 },
+        'diabetes': { emoji: '💉', label: 'Diabetes', desc: 'Inject into finger — blood sugar', duration: 1000 },
+        'pressure': { emoji: '🫀', label: 'Pressure', desc: 'Squeeze arm — blood pressure', duration: 1000 },
+        'allergy':  { emoji: '🤧', label: 'Allergy', desc: 'Point nose + flick away', duration: 1000 },
+        'allergic': { emoji: '🤧', label: 'Allergic', desc: 'Point nose + flick away', duration: 1000 },
+        'temperature':{ emoji: '🌡️', label: 'Temperature', desc: 'Hand slides on forehead', duration: 1000 },
+        'stress':   { emoji: '😰', label: 'Stress', desc: 'Claws grip at temples', duration: 1000 },
+        'anxiety':  { emoji: '😰', label: 'Anxiety', desc: 'Hands shake at chest', duration: 1000 },
+        'depression':{ emoji: '😞', label: 'Depression', desc: 'Middle fingers slide down chest', duration: 1200 },
+        'sleep':    { emoji: '😴', label: 'Sleep', desc: 'Hand closes sliding down cheek', duration: 1000 },
+        'insomnia': { emoji: '😳', label: 'Insomnia', desc: 'Eyes wide open — cannot sleep', duration: 1000 },
+        'numb':     { emoji: '🤚', label: 'Numb', desc: 'Hand goes limp — no feeling', duration: 800 },
+        'stiff':    { emoji: '🤜', label: 'Stiff', desc: 'Fists rigid — cannot bend', duration: 800 },
+        'cramp':    { emoji: '✊', label: 'Cramp', desc: 'Fist clenches tight — cramp', duration: 800 },
+        'sore':     { emoji: '😣', label: 'Sore', desc: 'Touch tender area — soreness', duration: 800 },
+        'weak':     { emoji: '😫', label: 'Weak', desc: 'Fingers collapse on palm', duration: 800 },
+        'faint':    { emoji: '😵', label: 'Faint', desc: 'Hand drops — passing out', duration: 1000 },
+        'unconscious':{ emoji: '😵', label: 'Unconscious', desc: 'Person down — not awake', duration: 1200 },
+        'conscious': { emoji: '😃', label: 'Conscious', desc: 'Eyes open — awake', duration: 800 },
+        'awake':    { emoji: '😃', label: 'Awake', desc: 'Eyes spring open', duration: 800 },
+        'constipation':{ emoji: '😣', label: 'Constipation', desc: 'Fist blocked — stuck', duration: 1000 },
+        'diarrhea': { emoji: '🚽', label: 'Diarrhea', desc: 'Liquid motion downward', duration: 1000 },
+        'asthma':   { emoji: '😮‍💨', label: 'Asthma', desc: 'Difficulty breathing sign', duration: 1200 },
+        'seizure':  { emoji: '⚡', label: 'Seizure', desc: 'Body shakes — seizure', duration: 1000 },
+        'stroke':   { emoji: '🧠⚡', label: 'Stroke', desc: 'Brain + lightning — stroke', duration: 1200 },
+        'cancer':   { emoji: '🎗️', label: 'Cancer', desc: 'Spread sign — cancer', duration: 1200 },
+        'hiv':      { emoji: '🔬', label: 'HIV', desc: 'Blood test sign', duration: 1000 },
+        'tb':       { emoji: '🫁', label: 'TB', desc: 'Cough + lungs', duration: 1000 },
+        'covid':    { emoji: '😷', label: 'COVID', desc: 'Mask + cough sign', duration: 1000 },
+        'malaria':  { emoji: '🦟', label: 'Malaria', desc: 'Mosquito + fever', duration: 1000 },
+        'wound':    { emoji: '🩹', label: 'Wound', desc: 'Cut on skin — injury', duration: 800 },
+        'cut':      { emoji: '🩹', label: 'Cut', desc: 'Slice on skin', duration: 800 },
+
+        // Medical procedures & items
+        'medicine':    { emoji: '💊', label: 'Medicine', desc: 'Middle finger taps palm — pills', duration: 1000 },
+        'medication':  { emoji: '💊', label: 'Medication', desc: 'Middle finger taps palm — pills', duration: 1000 },
+        'pill':        { emoji: '💊', label: 'Pill', desc: 'Pinch and flick to mouth — swallow pill', duration: 800 },
+        'pills':       { emoji: '💊', label: 'Pills', desc: 'Pinch and flick to mouth — pills', duration: 800 },
+        'tablet':      { emoji: '💊', label: 'Tablet', desc: 'Finger taps palm', duration: 800 },
+        'capsule':     { emoji: '💊', label: 'Capsule', desc: 'Small pill sign', duration: 800 },
+        'syrup':       { emoji: '🥤', label: 'Syrup', desc: 'Pour and drink motion', duration: 1000 },
+        'cream':       { emoji: '🧴', label: 'Cream', desc: 'Rub on skin motion', duration: 800 },
+        'ointment':    { emoji: '🧴', label: 'Ointment', desc: 'Rub on skin', duration: 800 },
+        'drops':       { emoji: '💧', label: 'Drops', desc: 'Pinch drops into eye or ear', duration: 800 },
+        'antibiotic':  { emoji: '💊🦠', label: 'Antibiotic', desc: 'Medicine that fights germs', duration: 1200 },
+        'painkiller':  { emoji: '💊😌', label: 'Painkiller', desc: 'Medicine that stops pain', duration: 1200 },
+        'doctor':      { emoji: '🩺', label: 'Doctor', desc: 'D-hand taps wrist pulse point', duration: 1000 },
+        'nurse':       { emoji: '👩‍⚕️', label: 'Nurse', desc: 'N-fingertips tap inside wrist', duration: 1000 },
+        'hospital':    { emoji: '🏥', label: 'Hospital', desc: 'Draw H-cross on upper arm', duration: 1000 },
+        'clinic':      { emoji: '🏥', label: 'Clinic', desc: 'Draw cross — medical place', duration: 1000 },
+        'pharmacy':    { emoji: '💊🏪', label: 'Pharmacy', desc: 'Medicine shop sign', duration: 1000 },
+        'help':        { emoji: '🆘', label: 'Help', desc: 'Thumbs-up on flat palm, lift together', duration: 1000 },
+        'emergency':   { emoji: '🚨', label: 'Emergency', desc: 'E-hand shakes rapidly', duration: 1000 },
+        'ambulance':   { emoji: '🚑', label: 'Ambulance', desc: 'Cross + driving motion', duration: 1000 },
+        'injection':   { emoji: '💉', label: 'Injection', desc: 'Push needle into upper arm', duration: 1000 },
+        'inject':      { emoji: '💉', label: 'Inject', desc: 'Needle motion into arm', duration: 1000 },
+        'vaccine':     { emoji: '💉', label: 'Vaccine', desc: 'Inject into upper arm', duration: 1000 },
+        'test':        { emoji: '🧪', label: 'Test', desc: 'Index finger taps palm — examine', duration: 800 },
+        'xray':        { emoji: '☢️', label: 'X-Ray', desc: 'Hands frame body — see through', duration: 1000 },
+        'scan':        { emoji: '🔬', label: 'Scan', desc: 'Hand sweeps over body', duration: 1000 },
+        'ultrasound':  { emoji: '🔊', label: 'Ultrasound', desc: 'Wand presses on belly', duration: 1000 },
+        'surgery':     { emoji: '🔪', label: 'Surgery', desc: 'Draw cut line on body', duration: 1000 },
+        'operation':   { emoji: '🔪', label: 'Operation', desc: 'Draw cut sign on body', duration: 1000 },
+        'prescription':{ emoji: '📝', label: 'Prescription', desc: 'Write on palm — Rx order', duration: 1000 },
+        'appointment': { emoji: '📅', label: 'Appointment', desc: 'Fist circles on palm — date set', duration: 1000 },
+        'bandage':     { emoji: '🩹', label: 'Bandage', desc: 'Wrap around arm', duration: 800 },
+        'oxygen':      { emoji: '😷', label: 'Oxygen', desc: 'Mask over face — breathing aid', duration: 1000 },
+        'wheelchair':  { emoji: '♿', label: 'Wheelchair', desc: 'Wheel motion at sides', duration: 1000 },
+        'stethoscope': { emoji: '🩺', label: 'Stethoscope', desc: 'Place on chest — listen', duration: 1000 },
+        'drip':        { emoji: '💧', label: 'Drip', desc: 'IV drip motion — fluid', duration: 800 },
+        'iv':          { emoji: '💉💧', label: 'IV', desc: 'Needle with drip — intravenous', duration: 1000 },
+        'plaster':     { emoji: '🩹', label: 'Plaster', desc: 'Stick on wound', duration: 800 },
+        'stitches':    { emoji: '🪡', label: 'Stitches', desc: 'Sew motion on skin', duration: 1000 },
+        'cast':        { emoji: '🦴🩹', label: 'Cast', desc: 'Wrap rigid around limb', duration: 1000 },
+        'crutches':    { emoji: '🩼', label: 'Crutches', desc: 'Walking support motion', duration: 1000 },
+        'thermometer': { emoji: '🌡️', label: 'Thermometer', desc: 'Check temperature — under tongue', duration: 1000 },
+        'mask':        { emoji: '😷', label: 'Mask', desc: 'Cover face with mask', duration: 800 },
+        'gloves':      { emoji: '🧤', label: 'Gloves', desc: 'Pull gloves onto hands', duration: 800 },
+
+        // Actions
+        'take':  { emoji: '🤲', label: 'Take', desc: 'Claw hand grabs inward', duration: 800 },
+        'give':  { emoji: '🫴', label: 'Give', desc: 'Open hand pushes outward', duration: 800 },
+        'wait':  { emoji: '✋', label: 'Wait', desc: 'Open palms hold — pause', duration: 800 },
+        'come':  { emoji: '🫳', label: 'Come', desc: 'Index fingers beckon toward self', duration: 800 },
+        'go':    { emoji: '👉', label: 'Go', desc: 'Both index fingers point and arc forward', duration: 800 },
+        'stop':  { emoji: '🛑', label: 'Stop', desc: 'Flat hand strikes other palm — halt', duration: 800 },
+        'sit':   { emoji: '🪑', label: 'Sit', desc: 'Two fingers hook on other two — sit down', duration: 800 },
+        'stand': { emoji: '🧍', label: 'Stand', desc: 'Two fingers stand on palm — stand up', duration: 800 },
+        'walk':  { emoji: '🚶', label: 'Walk', desc: 'Two fingers walk on palm', duration: 800 },
+        'lie':   { emoji: '🛏️', label: 'Lie Down', desc: 'Hand lies flat on palm', duration: 800 },
+        'open':  { emoji: '📖', label: 'Open', desc: 'Palms apart — open', duration: 800 },
+        'close': { emoji: '📕', label: 'Close', desc: 'Palms together — close', duration: 800 },
+        'eat':   { emoji: '🍽️', label: 'Eat', desc: 'Bunched fingers tap mouth repeatedly', duration: 800 },
+        'drink': { emoji: '🥤', label: 'Drink', desc: 'C-hand tips to mouth', duration: 800 },
+        'swallow':{ emoji: '🤲👇', label: 'Swallow', desc: 'Hand traces down throat', duration: 800 },
+        'feel':  { emoji: '🤚', label: 'Feel', desc: 'Middle finger taps chest — emotion', duration: 800 },
+        'need':  { emoji: '🫵', label: 'Need', desc: 'X-handshape bends downward — require', duration: 800 },
+        'want':  { emoji: '🤲', label: 'Want', desc: 'Clawed hands pull toward body', duration: 800 },
+        'understand': { emoji: '💡', label: 'Understand', desc: 'Index finger flicks up near forehead', duration: 1000 },
+        'know':  { emoji: '🧠', label: 'Know', desc: 'Flat hand taps forehead — knowledge', duration: 800 },
+        'see':   { emoji: '👀', label: 'See', desc: 'V-hand from eyes forward', duration: 600 },
+        'look':  { emoji: '👀', label: 'Look', desc: 'V-hand from eyes forward', duration: 600 },
+        'hear':  { emoji: '👂', label: 'Hear', desc: 'Cup hand at ear', duration: 600 },
+        'listen':{ emoji: '👂', label: 'Listen', desc: 'Cup hand at ear — pay attention', duration: 800 },
+        'think': { emoji: '🤔', label: 'Think', desc: 'Point at forehead — thinking', duration: 800 },
+        'remember':{ emoji: '💭', label: 'Remember', desc: 'Thumb from forehead pushes forward', duration: 1000 },
+        'forget':  { emoji: '🤦', label: 'Forget', desc: 'Hand wipes across forehead', duration: 1000 },
+        'tell':  { emoji: '🗣️', label: 'Tell', desc: 'Index from chin arcs forward', duration: 800 },
+        'say':   { emoji: '🗣️', label: 'Say', desc: 'Index circles near mouth', duration: 800 },
+        'speak': { emoji: '🗣️', label: 'Speak', desc: 'Four fingers tap from chin outward', duration: 800 },
+        'read':  { emoji: '📖', label: 'Read', desc: 'V-hand scans across flat palm', duration: 800 },
+        'write': { emoji: '✍️', label: 'Write', desc: 'Pinched hand writes on flat palm', duration: 800 },
+        'show':  { emoji: '👐', label: 'Show', desc: 'Flat hand presents forward', duration: 800 },
+        'have':  { emoji: '🤲', label: 'Have', desc: 'Hands pull to chest — possess', duration: 800 },
+        'can':   { emoji: '💪', label: 'Can', desc: 'Both fists move down together — able', duration: 800 },
+        'not':   { emoji: '🚫', label: 'Not', desc: 'Thumb from under chin forward — negative', duration: 800 },
+        "don't": { emoji: '🚫', label: "Don't", desc: 'Hands cross outward — negative', duration: 800 },
+        'try':   { emoji: '🤞', label: 'Try', desc: 'Fists push forward — attempt', duration: 800 },
+        'check': { emoji: '🔍', label: 'Check', desc: 'V-hand inspects palm', duration: 800 },
+        'examine':{ emoji: '🔍', label: 'Examine', desc: 'Look carefully at body', duration: 1000 },
+        'measure':{ emoji: '📏', label: 'Measure', desc: 'Hands measure distance apart', duration: 800 },
+        'clean': { emoji: '🧼', label: 'Clean', desc: 'Palm wipes other palm — clean', duration: 800 },
+        'wash':  { emoji: '🧼', label: 'Wash', desc: 'Rub hands together — washing', duration: 800 },
+        'rest':  { emoji: '😌', label: 'Rest', desc: 'Crossed arms on chest — rest', duration: 1000 },
+        'relax': { emoji: '😌', label: 'Relax', desc: 'Hands float down gently', duration: 1000 },
+        'exercise':{ emoji: '🏃', label: 'Exercise', desc: 'Arms pump up and down', duration: 1000 },
+        'move':  { emoji: '🔄', label: 'Move', desc: 'Hands shift position', duration: 800 },
+        'touch': { emoji: '👆', label: 'Touch', desc: 'Middle finger presses down', duration: 600 },
+        'press': { emoji: '👇', label: 'Press', desc: 'Push down firmly', duration: 600 },
+        'remove':{ emoji: '🗑️', label: 'Remove', desc: 'Pull away — remove', duration: 800 },
+        'apply': { emoji: '🤚', label: 'Apply', desc: 'Rub onto surface — apply', duration: 800 },
+        'put':   { emoji: '🫳', label: 'Put', desc: 'Place down gently', duration: 600 },
+
+        // Emotions
+        'happy': { emoji: '😊', label: 'Happy', desc: 'Flat hand brushes up on chest repeatedly', duration: 1000 },
+        'sad':   { emoji: '😢', label: 'Sad', desc: 'Open hands slide down face', duration: 1000 },
+        'angry': { emoji: '😠', label: 'Angry', desc: 'Claw hands pull from face — anger', duration: 1000 },
+        'scared':{ emoji: '😨', label: 'Scared', desc: 'Fists open toward body — fear', duration: 1000 },
+        'worried':{ emoji: '😟', label: 'Worried', desc: 'Hands alternate circles at forehead', duration: 1000 },
+        'confused':{ emoji: '😕', label: 'Confused', desc: 'Curved hands circle — confusion', duration: 1000 },
+        'calm':  { emoji: '😌', label: 'Calm', desc: 'Hands slowly lower — calm down', duration: 1000 },
+        'comfortable':{ emoji: '😊', label: 'Comfortable', desc: 'Palms stroke down — at ease', duration: 1000 },
+        'uncomfortable':{ emoji: '😣', label: 'Uncomfortable', desc: 'Hands twist — not at ease', duration: 1000 },
+
+        // Food & drink
+        'water':  { emoji: '💧', label: 'Water', desc: 'W-handshape taps chin — water', duration: 800 },
+        'food':   { emoji: '🍽️', label: 'Food', desc: 'Bunched fingers tap mouth — eat', duration: 800 },
+        'milk':   { emoji: '🥛', label: 'Milk', desc: 'Squeeze fist — milking motion', duration: 800 },
+        'juice':  { emoji: '🧃', label: 'Juice', desc: 'J-hand near chin', duration: 800 },
+        'tea':    { emoji: '☕', label: 'Tea', desc: 'Stir cup motion', duration: 800 },
+        'coffee': { emoji: '☕', label: 'Coffee', desc: 'Grind fists — coffee', duration: 800 },
+        'fruit':  { emoji: '🍎', label: 'Fruit', desc: 'F-hand on cheek twists', duration: 800 },
+        'bread':  { emoji: '🍞', label: 'Bread', desc: 'Slice across back of hand', duration: 800 },
+        'soup':   { emoji: '🥣', label: 'Soup', desc: 'Spoon scoops to mouth', duration: 800 },
+        'sugar':  { emoji: '🍬', label: 'Sugar', desc: 'Fingers stroke down chin — sweet', duration: 800 },
+        'salt':   { emoji: '🧂', label: 'Salt', desc: 'Sprinkle fingers — salt', duration: 800 },
+
+        // Time
+        'today':    { emoji: '📅', label: 'Today', desc: 'Both Y-hands drop — now/today', duration: 800 },
+        'tomorrow': { emoji: '📅➡️', label: 'Tomorrow', desc: 'Thumb forward from cheek', duration: 1000 },
+        'yesterday':{ emoji: '📅⬅️', label: 'Yesterday', desc: 'Thumb back at cheek', duration: 1000 },
+        'morning':  { emoji: '🌅', label: 'Morning', desc: 'Arm rises from forearm — sunrise', duration: 1000 },
+        'afternoon':{ emoji: '☀️', label: 'Afternoon', desc: 'Arm descends at angle — midday', duration: 1000 },
+        'evening':  { emoji: '🌇', label: 'Evening', desc: 'Hand descends on forearm — sunset', duration: 1000 },
+        'night':    { emoji: '🌙', label: 'Night', desc: 'Wrist bends down on forearm — dark', duration: 800 },
+        'time':     { emoji: '⏰', label: 'Time', desc: 'Index taps back of wrist — clock', duration: 800 },
+        'day':      { emoji: '☀️', label: 'Day', desc: 'Elbow on hand, arm arcs overhead', duration: 800 },
+        'week':     { emoji: '📆', label: 'Week', desc: 'Index slides across flat palm', duration: 800 },
+        'month':    { emoji: '🗓️', label: 'Month', desc: 'Index slides down other index', duration: 800 },
+        'year':     { emoji: '🔄', label: 'Year', desc: 'Fists orbit each other — year', duration: 1000 },
+        'minute':   { emoji: '⏱️', label: 'Minute', desc: 'Index ticks forward on palm', duration: 800 },
+        'hour':     { emoji: '🕐', label: 'Hour', desc: 'Index circles on palm — hour', duration: 800 },
+        'now':      { emoji: '👇', label: 'Now', desc: 'Both Y-hands drop — right now', duration: 600 },
+        'later':    { emoji: '👉⏰', label: 'Later', desc: 'L-hand tilts forward — future', duration: 800 },
+        'soon':     { emoji: '⏳', label: 'Soon', desc: 'Short time ahead', duration: 800 },
+        'always':   { emoji: '♾️', label: 'Always', desc: 'Index circles continuously', duration: 1000 },
+        'never':    { emoji: '🚫⏰', label: 'Never', desc: 'Hand swoops down — not ever', duration: 1000 },
+        'sometimes':{ emoji: '🔄❓', label: 'Sometimes', desc: 'Occasional — on and off', duration: 1000 },
+        'often':    { emoji: '🔄', label: 'Often', desc: 'Repeated bent-hand motion', duration: 800 },
+        'daily':    { emoji: '☀️📅', label: 'Daily', desc: 'Every day — thumb slides on cheek', duration: 1000 },
+        'twice':    { emoji: '✌️', label: 'Twice', desc: 'Two bounces on palm — two times', duration: 800 },
+
+        // Numbers
+        'one':   { emoji: '☝️', label: '1', desc: 'One finger up', duration: 600 },
+        'two':   { emoji: '✌️', label: '2', desc: 'Two fingers up', duration: 600 },
+        'three': { emoji: '🤟', label: '3', desc: 'Three fingers up', duration: 600 },
+        'four':  { emoji: '🖖', label: '4', desc: 'Four fingers up', duration: 600 },
+        'five':  { emoji: '🖐️', label: '5', desc: 'Open hand — five', duration: 600 },
+        'six':   { emoji: '🤙', label: '6', desc: 'Thumb + pinky extended', duration: 600 },
+        'seven': { emoji: '7️⃣', label: '7', desc: 'Seven', duration: 600 },
+        'eight': { emoji: '8️⃣', label: '8', desc: 'Eight', duration: 600 },
+        'nine':  { emoji: '9️⃣', label: '9', desc: 'Nine', duration: 600 },
+        'ten':   { emoji: '🔟', label: '10', desc: 'Ten', duration: 600 },
+        'once':  { emoji: '☝️', label: 'Once', desc: 'One time', duration: 600 },
+
+        // Descriptors
+        'big':    { emoji: '👐', label: 'Big', desc: 'Hands spread wide apart — large', duration: 800 },
+        'small':  { emoji: '🤏', label: 'Small', desc: 'Palms close together — little', duration: 800 },
+        'hot':    { emoji: '🥵', label: 'Hot', desc: 'Claw turns outward from mouth', duration: 800 },
+        'cold':   { emoji: '🥶', label: 'Cold', desc: 'Fists shiver close to body', duration: 800 },
+        'warm':   { emoji: '🌡️☀️', label: 'Warm', desc: 'Gentle heat — hand opens from chin', duration: 800 },
+        'better': { emoji: '👍✨', label: 'Better', desc: 'Open hand rises from chin — improved', duration: 800 },
+        'worse':  { emoji: '👎', label: 'Worse', desc: 'Claw drops downward — decline', duration: 800 },
+        'more':   { emoji: '➕', label: 'More', desc: 'Bunched fingertips tap together', duration: 800 },
+        'less':   { emoji: '➖', label: 'Less', desc: 'Hands close together — less', duration: 800 },
+        'many':   { emoji: '🖐️🖐️', label: 'Many', desc: 'Fingers flick open — lots', duration: 800 },
+        'few':    { emoji: '🤏', label: 'Few', desc: 'Thumb counts across fingers — some', duration: 800 },
+        'new':    { emoji: '✨', label: 'New', desc: 'Back of hand scoops on palm', duration: 800 },
+        'old':    { emoji: '👴', label: 'Old', desc: 'Fist drops from chin — beard', duration: 800 },
+        'same':   { emoji: '🤝', label: 'Same', desc: 'Index fingers tap together', duration: 800 },
+        'different':{ emoji: '↔️', label: 'Different', desc: 'Index fingers cross and pull apart', duration: 800 },
+        'important':{ emoji: '❗', label: 'Important', desc: 'Both F-hands rise to center', duration: 1000 },
+        'normal': { emoji: '👌', label: 'Normal', desc: 'Flat hands level — normal', duration: 800 },
+        'strong': { emoji: '💪', label: 'Strong', desc: 'Flex bicep — strong', duration: 800 },
+        'safe':   { emoji: '🛡️', label: 'Safe', desc: 'Crossed fists break apart — safe', duration: 800 },
+        'dangerous':{ emoji: '⚠️', label: 'Dangerous', desc: 'Fist rises on other fist — danger', duration: 1000 },
+        'left':   { emoji: '⬅️', label: 'Left', desc: 'L-hand moves left', duration: 600 },
+        'right':  { emoji: '➡️', label: 'Right', desc: 'R-hand moves right', duration: 600 },
+        'slow':   { emoji: '🐢', label: 'Slow', desc: 'Hand glides slowly up other hand', duration: 800 },
+        'fast':   { emoji: '⚡', label: 'Fast', desc: 'L-hands flick — quick', duration: 800 },
+        'deep':   { emoji: '👇⬇️', label: 'Deep', desc: 'Hand pushes deep down', duration: 800 },
+        'sharp':  { emoji: '📌', label: 'Sharp', desc: 'Sharp point motion — stabbing', duration: 800 },
+        'dull':   { emoji: '😑', label: 'Dull', desc: 'Flat aching feeling', duration: 800 },
+        'chronic':{ emoji: '🔄😣', label: 'Chronic', desc: 'Ongoing — long-lasting pain', duration: 1200 },
+        'severe': { emoji: '😣❗', label: 'Severe', desc: 'Intense — very bad', duration: 1000 },
+        'mild':   { emoji: '🤏', label: 'Mild', desc: 'Small amount — gentle', duration: 800 },
+        'moderate':{ emoji: '➖', label: 'Moderate', desc: 'Medium level — in between', duration: 800 },
+
+        // People & places
+        'family':  { emoji: '👨‍👩‍👧‍👦', label: 'Family', desc: 'F-hands circle out from body', duration: 1000 },
+        'mother':  { emoji: '👩', label: 'Mother', desc: 'Thumb taps chin — mother', duration: 800 },
+        'father':  { emoji: '👨', label: 'Father', desc: 'Thumb taps forehead — father', duration: 800 },
+        'child':   { emoji: '👶', label: 'Child', desc: 'Lower hand pats — small person', duration: 800 },
+        'baby':    { emoji: '👶', label: 'Baby', desc: 'Rock arms — baby in arms', duration: 1000 },
+        'home':    { emoji: '🏠', label: 'Home', desc: 'Bunched fingers touch cheek then jaw', duration: 1000 },
+        'bathroom':{ emoji: '🚻', label: 'Bathroom', desc: 'T-hand shakes side to side', duration: 800 },
+        'person':  { emoji: '🧑', label: 'Person', desc: 'Draw body outline with P-hands', duration: 800 },
+        'man':     { emoji: '👨', label: 'Man', desc: 'Open hand from forehead — male', duration: 800 },
+        'woman':   { emoji: '👩', label: 'Woman', desc: 'Open hand from chin — female', duration: 800 },
+
+        // Misc
+        'phone':   { emoji: '📱', label: 'Phone', desc: 'Y-hand held at ear', duration: 800 },
+        'money':   { emoji: '💰', label: 'Money', desc: 'Back of hand taps palm — money', duration: 800 },
+        'question':{ emoji: '❓', label: 'Question', desc: 'Draw question mark in air', duration: 800 },
+        'answer':  { emoji: '💬', label: 'Answer', desc: 'Index fingers from mouth outward', duration: 800 },
+        'name':    { emoji: '🏷️', label: 'Name', desc: 'H-fingers tap — name', duration: 1000 },
+        'sign':    { emoji: '🤟', label: 'Sign', desc: 'Index fingers alternate circles — sign language', duration: 1000 },
+        'language':{ emoji: '🤟', label: 'Language', desc: 'L-hands pull apart — language', duration: 1000 },
+        'again':   { emoji: '🔄', label: 'Again', desc: 'Curved hand arcs into flat palm — repeat', duration: 800 },
+        'maybe':   { emoji: '🤷', label: 'Maybe', desc: 'Flat palms alternate up and down', duration: 800 },
+        'ready':   { emoji: '👊', label: 'Ready', desc: 'R-hands move outward — prepared', duration: 800 },
+        'finish':  { emoji: '👏', label: 'Finish', desc: 'Hands flip outward — all done', duration: 800 },
+        'start':   { emoji: '▶️', label: 'Start', desc: 'Index finger twists in V-hand — begin', duration: 800 },
+        'done':    { emoji: '✅', label: 'Done', desc: 'Hands flip outward — complete', duration: 800 },
+        'here':    { emoji: '📍', label: 'Here', desc: 'Flat palms circle — this place', duration: 600 },
+        'there':   { emoji: '👉📍', label: 'There', desc: 'Point away — that place', duration: 800 },
+        'positive':{ emoji: '➕', label: 'Positive', desc: 'Plus sign — positive result', duration: 800 },
+        'negative':{ emoji: '➖', label: 'Negative', desc: 'Minus sign — negative result', duration: 800 },
+        'true':    { emoji: '✅', label: 'True', desc: 'Index from mouth forward — honest', duration: 800 },
+        'correct': { emoji: '✅', label: 'Correct', desc: 'Index taps index — right', duration: 800 },
+        'wrong':   { emoji: '❌', label: 'Wrong', desc: 'Y-hand on chin — mistake', duration: 800 },
+        'careful': { emoji: '⚠️', label: 'Careful', desc: 'K-hands tap — be cautious', duration: 800 },
+        'follow':  { emoji: '👉', label: 'Follow', desc: 'A-hands follow — come after', duration: 800 },
+        'return':  { emoji: '🔙', label: 'Return', desc: 'Hand arcs back — come back', duration: 800 },
+        'continue':{ emoji: '➡️', label: 'Continue', desc: 'Palms push forward — keep going', duration: 800 },
+        'every':   { emoji: '🔄', label: 'Every', desc: 'Thumb slides down knuckles', duration: 800 },
+        'each':    { emoji: '🔄', label: 'Each', desc: 'Thumb counts across fingers', duration: 800 },
+        'bad':     { emoji: '👎', label: 'Bad', desc: 'Flat hand from chin turns down', duration: 800 },
+        'friend':  { emoji: '🤝', label: 'Friend', desc: 'Hook index fingers and flip', duration: 1000 },
+        'love':    { emoji: '🤗', label: 'Love', desc: 'Cross arms over chest — love', duration: 1000 },
+        'work':    { emoji: '👊', label: 'Work', desc: 'Fist taps other wrist — work', duration: 1000 },
+    };
+
     static SKIP = new Set(['the','a','an','is','are','am','was','were','be','to','of','in','it','for','on','with','at','that','will','and','but','or','has','had','do','does','did','been','being','by','from','up','about','into','through','during','before','after','between','out','so','very','just','also','than','then','as','its','my','our','his','her','their']);
 
     static PHRASES = {
         'thank you':['thank'], 'how are you':['how','you'], 'i need':['i','need'], 'i have':['i','have'],
         'take medicine':['take','medicine'], 'come back':['come','back'], 'follow up':['appointment'],
-        'x-ray':['xray'], 'dont':['not'], 'cannot':['can','not'], "can't":['can','not'], "won't":['not'], "i'm":['i'], "you're":['you'],
+        'x-ray':['xray'], 'dont':['not'], 'cannot':['can','not'], "can't":['can','not'], "won't":['not'],
+        "i'm":['i'], "you're":['you'], 'blood pressure':['pressure'], 'sit down':['sit'],
+        'lie down':['lie'], 'stand up':['stand'], 'blood test':['blood','test'],
+        'side effect':['medicine','dangerous'], "don't understand":['not','understand'],
+        'i love you':['love'], 'thank you very much':['thank'],
     };
 
-    // ═══════════════ IDLE ═══════════════
+    /* ═══════════════════════════════════════════════════════════════
+       SIGNING — Word by word with per-sign durations
+       ═══════════════════════════════════════════════════════════════ */
     idle() {
-        this._moveHandsTo(this.B.lWristRest, this.B.rWristRest, 0, 0);
-        this._drawHand('l', 'relax'); this._drawHand('r', 'relax');
-        this._setExpression('neutral'); this._hideLabel();
+        const u = this.uid;
+        if (this._timeoutId) { clearTimeout(this._timeoutId); this._timeoutId = null; }
+        document.getElementById(`${u}_idle`).style.display = 'flex';
+        document.getElementById(`${u}_active`).style.display = 'none';
+        document.getElementById(`${u}_done`).style.display = 'none';
         this.isSigning = false;
     }
 
-    _poseSign(sign) {
-        const B = this.B;
-        this._moveHandsTo(sign.lPos || B.lWristRest, sign.rPos || B.rWristRest, sign.lRot || 0, sign.rRot || 0);
-        this._drawHand('l', sign.lShape || 'relax');
-        this._drawHand('r', sign.rShape || 'relax');
-        this._setExpression(sign.expression || 'neutral');
-        this._showLabel(`\u{1F91F} ${sign.label}`);
+    replay() {
+        if (this._lastText) {
+            this.signSentence(this._lastText, this._lastOpts);
+        }
     }
 
-    // ═══════════════ SIGN SENTENCE ═══════════════
     async signSentence(text, opts = {}) {
-        if (this.isSigning) { this.isSigning = false; await this._delay(100); }
+        if (this.isSigning) { this.isSigning = false; await this._delay(150); }
         this.isSigning = true;
-        const msPerSign = opts.msPerSign || 1200;
+        this._lastText = text;
+        this._lastOpts = opts;
+        const u = this.uid;
         const onWord = opts.onWord || null;
         const onDone = opts.onDone || null;
+
         const tokens = this._tokenize(text);
 
+        // Show active state
+        document.getElementById(`${u}_idle`).style.display = 'none';
+        document.getElementById(`${u}_done`).style.display = 'none';
+        document.getElementById(`${u}_active`).style.display = 'flex';
+
+        // Build the word strip
+        const strip = document.getElementById(`${u}_strip`);
+        strip.innerHTML = tokens.map((t, i) => {
+            const key = t.toLowerCase().replace(/[^a-z0-9'-]/g, '');
+            const isSkip = SignLanguageAvatar.SKIP.has(key);
+            return `<span id="${u}_sw_${i}" style="
+                padding: 4px 10px;
+                border-radius: 8px;
+                font-size: 13px;
+                font-weight: 600;
+                background: ${isSkip ? '#F1F5F9' : '#E2E8F0'};
+                color: ${isSkip ? '#94A3B8' : '#475569'};
+                transition: all 0.3s ease;
+                ${isSkip ? 'text-decoration: line-through;' : ''}
+            ">${this._escHtml(t)}</span>`;
+        }).join('');
+
+        const emojiEl = document.getElementById(`${u}_emoji`);
+        const wordEl  = document.getElementById(`${u}_word`);
+        const descEl  = document.getElementById(`${u}_desc`);
+        const badgeEl = document.getElementById(`${u}_badge`);
+        const countText = document.getElementById(`${u}_countText`);
+        const typeText  = document.getElementById(`${u}_typeText`);
+        const progBar   = document.getElementById(`${u}_progbar`);
+
+        // Count signable tokens
+        let signCount = 0;
+        let signTotal = tokens.filter(t => !SignLanguageAvatar.SKIP.has(t.toLowerCase().replace(/[^a-z0-9'-]/g, ''))).length;
+
+        // Sign each token word by word
         for (let i = 0; i < tokens.length; i++) {
             if (!this.isSigning) break;
             const token = tokens[i];
             if (onWord) onWord(token, i, tokens.length);
             const key = token.toLowerCase().replace(/[^a-z0-9'-]/g, '');
-            if (SignLanguageAvatar.SKIP.has(key)) continue;
+
+            // Highlight current word in strip
+            const sw = document.getElementById(`${u}_sw_${i}`);
+            if (sw) {
+                sw.style.background = '#0D9488';
+                sw.style.color = 'white';
+                sw.style.transform = 'scale(1.15)';
+                sw.style.boxShadow = '0 2px 8px rgba(13,148,136,0.4)';
+            }
+
+            if (SignLanguageAvatar.SKIP.has(key)) {
+                await this._delay(200);
+                if (sw) { sw.style.background = '#CBD5E1'; sw.style.color = '#64748B'; sw.style.transform = 'scale(1)'; sw.style.boxShadow = 'none'; }
+                continue;
+            }
+
+            signCount++;
+            // Update progress
+            const pct = ((signCount) / signTotal * 100).toFixed(0);
+            progBar.style.width = pct + '%';
+            countText.textContent = `Sign ${signCount} of ${signTotal}`;
+
             const sign = SignLanguageAvatar.SIGNS[key];
-            if (!sign) { await this._fingerspell(token); continue; }
-            this._poseSign(sign);
-            if (sign.motion) { await this._delay(300); await this._doMotion(sign.motion, sign); }
-            await this._delay(msPerSign);
-            if (i < tokens.length - 1 && this.isSigning) {
-                this._moveHandsTo({x:this.B.lWristRest.x,y:this.B.lWristRest.y-20},{x:this.B.rWristRest.x,y:this.B.rWristRest.y-20},0,0);
-                await this._delay(250);
+            if (sign) {
+                // WORD SIGN
+                badgeEl.textContent = 'WORD SIGN';
+                badgeEl.style.background = '#DBEAFE';
+                badgeEl.style.color = '#1E40AF';
+                typeText.textContent = 'Word Sign';
+
+                // Bounce animation
+                emojiEl.style.transform = 'scale(0.3)';
+                emojiEl.style.opacity = '0.3';
+                await this._delay(150);
+                emojiEl.textContent = sign.emoji;
+                wordEl.textContent = sign.label;
+                descEl.textContent = sign.desc;
+                emojiEl.style.transform = 'scale(1.15)';
+                emojiEl.style.opacity = '1';
+                await this._delay(200);
+                emojiEl.style.transform = 'scale(1)';
+                await this._delay((sign.duration || 800) - 350);
+            } else {
+                // FINGERSPELLING
+                badgeEl.textContent = 'FINGERSPELLING';
+                badgeEl.style.background = '#FEF3C7';
+                badgeEl.style.color = '#92400E';
+                typeText.textContent = 'Fingerspelling';
+
+                await this._fingerspell(token, emojiEl, wordEl, descEl);
+
+                // Pause between fingerspelled words for visual clarity
+                emojiEl.style.transform = 'scale(0.8)';
+                emojiEl.style.opacity = '0.5';
+                await this._delay(400);
+                emojiEl.style.opacity = '1';
+                emojiEl.style.transform = 'scale(1)';
+            }
+
+            // Mark word as completed in strip
+            if (sw) {
+                sw.style.background = '#CCFBF1';
+                sw.style.color = '#0D9488';
+                sw.style.transform = 'scale(1)';
+                sw.style.boxShadow = 'none';
             }
         }
-        if (this.isSigning) this.idle();
+
+        // Show done state
+        if (this.isSigning) {
+            document.getElementById(`${u}_active`).style.display = 'none';
+            document.getElementById(`${u}_done`).style.display = 'flex';
+            document.getElementById(`${u}_fullmsg`).textContent = `"${text}"`;
+            this._timeoutId = setTimeout(() => { if (!this.isSigning) this.idle(); }, 5000);
+        }
         this.isSigning = false;
         if (onDone) onDone();
     }
 
-    cancel() { this.isSigning = false; this.idle(); }
+    cancel() {
+        this.isSigning = false;
+        if (this._timeoutId) { clearTimeout(this._timeoutId); this._timeoutId = null; }
+        this.idle();
+    }
 
-    // ═══════════════ SECONDARY MOTIONS ═══════════════
-    async _doMotion(type, sign) {
-        if (!this.isSigning) return;
-        const rP = sign.rPos || this.B.rWristRest;
-        const lP = sign.lPos || this.B.lWristRest;
-        switch (type) {
-            case 'wave_away':
-                this._moveHandsTo(null,{x:rP.x+25,y:rP.y},null,-15); await this._delay(250);
-                this._moveHandsTo(null,{x:rP.x,y:rP.y},null,10); await this._delay(250); break;
-            case 'wave_side':
-                for(let i=0;i<2&&this.isSigning;i++){
-                    this._moveHandsTo(null,{x:rP.x+15,y:rP.y},null,10); await this._delay(200);
-                    this._moveHandsTo(null,{x:rP.x-15,y:rP.y},null,-10); await this._delay(200);
-                } break;
-            case 'nod_fist':
-                for(let i=0;i<2&&this.isSigning;i++){
-                    this._moveHandsTo(null,{x:rP.x,y:rP.y-12}); await this._delay(180);
-                    this._moveHandsTo(null,{x:rP.x,y:rP.y+8}); await this._delay(180);
-                } break;
-            case 'pinch_close':
-                this._drawHand('r','pinch'); await this._delay(200);
-                this._drawHand('r','fist'); await this._delay(200);
-                this._drawHand('r','pinch'); await this._delay(200); break;
-            case 'chin_forward':
-                this._moveHandsTo(null,{x:rP.x+20,y:rP.y+15}); await this._delay(350); break;
-            case 'circle_chest':
-                for(let a=0;a<360&&this.isSigning;a+=45){
-                    const r=a*Math.PI/180;
-                    this._moveHandsTo(null,{x:rP.x+Math.cos(r)*15,y:rP.y+Math.sin(r)*15}); await this._delay(80);
-                } break;
-            case 'tap':
-                this._moveHandsTo(lP,{x:rP.x,y:rP.y-8}); await this._delay(180);
-                this._moveHandsTo(lP,rP); await this._delay(180);
-                this._moveHandsTo(lP,{x:rP.x,y:rP.y-8}); await this._delay(180); break;
-            case 'twist':
-                this._moveHandsTo({x:lP.x-5,y:lP.y-10},{x:rP.x+5,y:rP.y+10}); await this._delay(250);
-                this._moveHandsTo({x:lP.x+5,y:lP.y+10},{x:rP.x-5,y:rP.y-10}); await this._delay(250); break;
-            case 'circle_head':
-                for(let a=0;a<360&&this.isSigning;a+=60){
-                    const r=a*Math.PI/180;
-                    this._moveHandsTo(null,{x:rP.x+Math.cos(r)*18,y:rP.y+Math.sin(r)*12}); await this._delay(100);
-                } break;
-            case 'circle_body':
-                for(let a=0;a<360&&this.isSigning;a+=60){
-                    const r=a*Math.PI/180;
-                    this._moveHandsTo(null,{x:rP.x+Math.cos(r)*12,y:rP.y+Math.sin(r)*12}); await this._delay(80);
-                } break;
-            case 'breathe':
-                this._moveHandsTo({x:lP.x+10,y:lP.y+15},{x:rP.x-10,y:rP.y+15}); await this._delay(400);
-                this._moveHandsTo(lP,rP); await this._delay(400); break;
-            case 'slide':
-                this._moveHandsTo(null,{x:rP.x-25,y:rP.y}); await this._delay(300); break;
-            case 'write':
-                for(let i=0;i<3&&this.isSigning;i++){
-                    this._moveHandsTo(null,{x:rP.x+12,y:rP.y+8}); await this._delay(150);
-                    this._moveHandsTo(null,{x:rP.x-8,y:rP.y+16}); await this._delay(150);
-                } break;
-            case 'wag':
-                for(let i=0;i<2&&this.isSigning;i++){
-                    this._moveHandsTo(null,{x:rP.x+12,y:rP.y}); await this._delay(180);
-                    this._moveHandsTo(null,{x:rP.x-12,y:rP.y}); await this._delay(180);
-                } break;
-            case 'beckon':
-                this._drawHand('r','point'); await this._delay(200);
-                this._drawHand('r','fist'); await this._delay(200);
-                this._drawHand('r','point'); await this._delay(200); break;
-            case 'flick_up':
-                this._moveHandsTo(null,{x:rP.x,y:rP.y-25});
-                this._drawHand('r','open'); await this._delay(300); break;
-            case 'grab_in':
-                this._drawHand('r','open'); await this._delay(200);
-                this._moveHandsTo(null,{x:rP.x-20,y:rP.y});
-                this._drawHand('r','fist'); await this._delay(300); break;
-            case 'pull_down':
-                this._moveHandsTo(null,{x:rP.x,y:rP.y+30}); await this._delay(350); break;
-            case 'shiver':
-                for(let i=0;i<3&&this.isSigning;i++){
-                    this._moveHandsTo({x:lP.x+4,y:lP.y},{x:rP.x-4,y:rP.y}); await this._delay(120);
-                    this._moveHandsTo({x:lP.x-4,y:lP.y},{x:rP.x+4,y:rP.y}); await this._delay(120);
-                } break;
-            case 'sweep_lr':
-                this._moveHandsTo(null,{x:this.B.chest.x-30,y:rP.y}); await this._delay(200);
-                this._moveHandsTo(null,{x:this.B.chest.x+60,y:rP.y}); await this._delay(300); break;
-            case 'chin_to_palm':
-                this._moveHandsTo(null,{x:rP.x,y:rP.y+80}); await this._delay(400); break;
-            case 'h_cross':
-                this._moveHandsTo(null,{x:rP.x,y:rP.y-15}); await this._delay(200);
-                this._moveHandsTo(null,{x:rP.x+15,y:rP.y}); await this._delay(200); break;
-            case 'circle_palm':
-                for(let a=0;a<360&&this.isSigning;a+=60){
-                    const r=a*Math.PI/180;
-                    this._moveHandsTo(null,{x:rP.x+Math.cos(r)*10,y:rP.y+Math.sin(r)*10}); await this._delay(80);
-                } break;
+    /* ═══════════════════════════════════════════════════════════════
+       FINGERSPELLING — ASL alphabet, letter by letter
+       ═══════════════════════════════════════════════════════════════ */
+    async _fingerspell(word, emojiEl, wordEl, descEl) {
+        const letters = word.toUpperCase().split('');
+        for (let i = 0; i < letters.length && this.isSigning; i++) {
+            const ch = letters[i];
+            const asl = SignLanguageAvatar.ASL_ALPHA[ch];
+            if (!asl) continue;
+            emojiEl.style.transform = 'scale(0.5)';
+            await this._delay(80);
+            emojiEl.textContent = asl.emoji;
+            wordEl.textContent = ch;
+            descEl.textContent = `${asl.desc}  ·  Spelling: ${word.toUpperCase()} (${i + 1}/${letters.length})`;
+            emojiEl.style.transform = 'scale(1)';
+            await this._delay(550);
         }
     }
 
-    // ═══════════════ FINGERSPELLING ═══════════════
-    async _fingerspell(word) {
-        const shapes = ['point','flat','fist','open','peace','claw','thumb_up','ok','three','y_hand'];
-        for (let i = 0; i < word.length && this.isSigning; i++) {
-            const ch = word[i].toUpperCase();
-            const si = ch.charCodeAt(0) % shapes.length;
-            this._moveHandsTo(null, {x:230, y:165 + ((i%3)-1)*12});
-            this._drawHand('r', shapes[si]);
-            this._showLabel(`\u270B ${ch}  (${word})`);
-            await this._delay(420);
-        }
-    }
-
-    // ═══════════════ TOKENIZER ═══════════════
+    /* ═══════════════════════════════════════════════════════════════
+       TOKENIZER
+       ═══════════════════════════════════════════════════════════════ */
     _tokenize(text) {
         let lower = text.toLowerCase().replace(/[^\w\s'-]/g, '').trim();
         const words = lower.split(/\s+/);
@@ -642,7 +781,7 @@ class SignLanguageAvatar {
         let i = 0;
         while (i < words.length) {
             let matched = false;
-            for (let len = 3; len >= 2; len--) {
+            for (let len = 4; len >= 2; len--) {
                 if (i + len <= words.length) {
                     const phrase = words.slice(i, i + len).join(' ');
                     const mapped = SignLanguageAvatar.PHRASES[phrase];
@@ -652,6 +791,12 @@ class SignLanguageAvatar {
             if (!matched) { tokens.push(words[i]); i++; }
         }
         return tokens;
+    }
+
+    _escHtml(text) {
+        const div = document.createElement('div');
+        div.appendChild(document.createTextNode(text));
+        return div.innerHTML;
     }
 
     _delay(ms) { return new Promise(r => setTimeout(r, ms)); }

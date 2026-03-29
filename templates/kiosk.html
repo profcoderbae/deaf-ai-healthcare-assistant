@@ -56,7 +56,7 @@
             <div class="flex justify-center mb-8">
                 <div class="webcam-container" id="webcamBox">
                     <video id="webcamVideo" autoplay playsinline></video>
-                    <canvas id="webcamCanvas" width="640" height="480"></canvas>
+                    <canvas id="webcamCanvas" width="1280" height="720"></canvas>
                     <div class="webcam-label">📷 Camera Active</div>
                     <div class="gesture-indicator" id="gestureIndicator">Detected!</div>
                 </div>
@@ -118,11 +118,26 @@
                         <h3 class="text-sm font-semibold text-gray-500 mb-2">
                             <i class="fas fa-camera mr-1"></i> Your Camera
                         </h3>
-                        <div class="webcam-container mx-auto" style="width:100%;height:320px;">
+                        <div class="webcam-container mx-auto" style="width:100%;max-width:100%;height:380px;">
                             <video id="signVideo" autoplay playsinline></video>
-                            <canvas id="signCanvas" width="640" height="480"></canvas>
+                            <canvas id="signCanvas" width="1280" height="720"></canvas>
                             <div class="gesture-indicator" id="signGestureInd">👌</div>
                         </div>
+
+                        <!-- Detection Mode Buttons -->
+                        <div class="flex gap-1 mt-2 justify-center">
+                            <button onclick="setKioskSignMode('glosses')" id="kioskModeGlosses" class="text-xs px-3 py-1 rounded-full bg-teal-600 text-white font-semibold">🤟 Words</button>
+                            <button onclick="setKioskSignMode('alpha')" id="kioskModeAlpha" class="text-xs px-3 py-1 rounded-full bg-gray-200 text-gray-600 font-semibold">🔤 Letters</button>
+                            <button onclick="setKioskSignMode('num')" id="kioskModeNum" class="text-xs px-3 py-1 rounded-full bg-gray-200 text-gray-600 font-semibold">🔢 Numbers</button>
+                        </div>
+
+                        <!-- Detection Result Display -->
+                        <div class="bg-teal-50 rounded-xl p-3 mt-2 text-center">
+                            <div id="kioskDetectionValue" class="text-2xl font-bold text-teal-700 min-h-[40px]">—</div>
+                            <div id="kioskDetectionConf" class="text-xs text-gray-400"></div>
+                            <div id="kioskDetectionSentence" class="text-sm text-teal-800 mt-1 font-medium min-h-[20px]"></div>
+                        </div>
+
                         <div id="gestureLabel" class="text-center text-sm text-gray-500 mt-2">
                             Show gestures to interact
                         </div>
@@ -215,8 +230,10 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="/static/js/gesture.js"></script>
     <script src="/static/js/avatar.js"></script>
+    <script src="/static/js/sign_detect.js"></script>
     <script>
     // ─── State ───
     let patientName = '';
@@ -229,6 +246,7 @@
     let avatar = null;
     let triageAvatar = null;
     let resultAvatar = null;
+    let signDetectionClient = null;
 
     // ─── Clock ───
     function updateClock() {
@@ -332,31 +350,117 @@
 
     async function initSignWebcam() {
         try {
-            const signDetector = new GestureDetector();
             const video = document.getElementById('signVideo');
             const canvas = document.getElementById('signCanvas');
-            await signDetector.init(video, canvas, (gesture) => {
-                const label = GESTURE_LABELS[gesture] || gesture;
-                document.getElementById('signGestureInd').textContent = label;
-                document.getElementById('signGestureInd').classList.add('active');
-                document.getElementById('gestureLabel').textContent = label;
-                setTimeout(() => {
-                    document.getElementById('signGestureInd').classList.remove('active');
-                }, 2000);
 
-                // Map gestures to option selection
-                if (gesture === 'thumbs_up' && currentStep) {
-                    // Select first option
-                    const options = currentStep.options;
-                    if (options && options.length > 0) {
-                        selectOption(options[0]);
+            // Get webcam stream for the sign video element
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 1280, height: 720, facingMode: 'user' }
+            });
+            video.srcObject = stream;
+            await video.play();
+
+            // Initialize SocketIO-based sign detection client
+            signDetectionClient = new SignDetectionClient({
+                video: video,
+                canvas: canvas,
+                mode: 'glosses',
+                captureRate: 150,
+                onDetection: (result) => {
+                    const indicator = document.getElementById('signGestureInd');
+                    const valueEl = document.getElementById('kioskDetectionValue');
+                    const confEl = document.getElementById('kioskDetectionConf');
+                    const sentenceEl = document.getElementById('kioskDetectionSentence');
+                    const label = document.getElementById('gestureLabel');
+
+                    if (result.type === 'letter' || result.type === 'number') {
+                        const val = result.value;
+                        valueEl.textContent = val;
+                        confEl.textContent = `Confidence: ${(result.confidence * 100).toFixed(0)}%`;
+                        sentenceEl.textContent = result.sentence || '';
+                        indicator.textContent = val;
+                        indicator.classList.add('active');
+                        label.textContent = `Detected: ${val}`;
+                        setTimeout(() => indicator.classList.remove('active'), 1500);
+                    } else if (result.type === 'word') {
+                        valueEl.textContent = result.value;
+                        confEl.textContent = result.gesture ? `Gesture: ${result.gesture}` : '';
+                        sentenceEl.textContent = result.sentence || '';
+                        indicator.textContent = result.value;
+                        indicator.classList.add('active');
+                        label.textContent = `Detected: ${result.value}`;
+                        setTimeout(() => indicator.classList.remove('active'), 2000);
+
+                        // Map detected words to triage option selection
+                        if (currentStep && currentStep.options) {
+                            const detected = result.value.toLowerCase();
+                            if (detected === 'yes' || detected === 'thumbs up') {
+                                const opt = currentStep.options.find(o => /yes|okay|ok/i.test(o.label));
+                                if (opt) selectOption(opt);
+                            } else if (detected === 'no') {
+                                const opt = currentStep.options.find(o => /no|not/i.test(o.label));
+                                if (opt) selectOption(opt);
+                            }
+                        }
+                    } else if (result.type === 'status') {
+                        if (result.status === 'collecting') {
+                            valueEl.textContent = '...';
+                            confEl.textContent = `Collecting frames: ${result.frames || ''}`;
+                        } else if (result.status === 'scanning') {
+                            label.textContent = 'Scanning for signs...';
+                        } else if (result.status === 'no_hand') {
+                            valueEl.textContent = '✋';
+                            confEl.textContent = 'Show your hand to the camera';
+                        }
                     }
+                },
+                onStatusChange: (status) => {
+                    console.log('[Kiosk Sign] Status:', status);
                 }
             });
-            await signDetector.start();
+
+            await signDetectionClient.init();
+            await signDetectionClient.start();
         } catch(e) {
             console.warn('Sign webcam unavailable:', e);
+            // Fallback to old gesture detector
+            try {
+                const signDetector = new GestureDetector();
+                const video = document.getElementById('signVideo');
+                const canvas = document.getElementById('signCanvas');
+                await signDetector.init(video, canvas, (gesture) => {
+                    const label = GESTURE_LABELS[gesture] || gesture;
+                    document.getElementById('signGestureInd').textContent = label;
+                    document.getElementById('signGestureInd').classList.add('active');
+                    document.getElementById('gestureLabel').textContent = label;
+                    setTimeout(() => document.getElementById('signGestureInd').classList.remove('active'), 2000);
+                    if (gesture === 'thumbs_up' && currentStep) {
+                        const options = currentStep.options;
+                        if (options && options.length > 0) selectOption(options[0]);
+                    }
+                });
+                await signDetector.start();
+            } catch(e2) {
+                console.warn('Gesture fallback also unavailable:', e2);
+            }
         }
+    }
+
+    function setKioskSignMode(mode) {
+        if (!signDetectionClient) return;
+        signDetectionClient.setMode(mode);
+        // Update button styles
+        ['glosses', 'alpha', 'num'].forEach(m => {
+            const btn = document.getElementById('kioskMode' + m.charAt(0).toUpperCase() + m.slice(1));
+            if (btn) {
+                btn.className = m === mode
+                    ? 'text-xs px-3 py-1 rounded-full bg-teal-600 text-white font-semibold'
+                    : 'text-xs px-3 py-1 rounded-full bg-gray-200 text-gray-600 font-semibold';
+            }
+        });
+        document.getElementById('kioskDetectionValue').textContent = '—';
+        document.getElementById('kioskDetectionConf').textContent = '';
+        document.getElementById('kioskDetectionSentence').textContent = '';
     }
 
     // ─── Triage Flow ───
@@ -531,6 +635,12 @@
         answers = [];
         stepHistory = [];
         currentStep = null;
+
+        // Stop sign detection client
+        if (signDetectionClient) {
+            signDetectionClient.destroy();
+            signDetectionClient = null;
+        }
 
         document.getElementById('resultArea').style.display = 'none';
         document.getElementById('waveStage').style.display = 'block';
