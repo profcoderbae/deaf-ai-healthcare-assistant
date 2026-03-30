@@ -3,6 +3,7 @@
 > **AI-powered healthcare communication system** for deaf patients at Tygerberg Hospital, using real-time sign language detection, an animated avatar assistant, and bidirectional translation between sign language and speech.
 
 **Live Demo**: [https://deaf-ai-healthcare-assistant.onrender.com](https://deaf-ai-healthcare-assistant.onrender.com)  
+**Video Demo (for Supervisors)**: [Watch on Google Drive](https://drive.google.com/file/d/1oulDa-HNMHmBgl0Oaro54iwEd8HaXmAi/view?usp=drivesdk)  
 **GitHub**: [profcoderbae/deaf-ai-healthcare-assistant](https://github.com/profcoderbae/deaf-ai-healthcare-assistant)
 
 ---
