@@ -1,0 +1,69 @@
+# Breeding Data Pipeline Configuration
+# Subtropical Fruit Breeding Program - Multi-Site Trial Data Management
+
+database:
+  path: "data/breeding_trials.db"
+  schema_version: "1.0"
+
+data_sources:
+  field_trials:
+    file_pattern: "data/raw/*.csv"
+    date_format: "%Y-%m-%d"
+  
+crops:
+  - name: "mango"
+    traits:
+      - fruit_weight_g
+      - brix_content
+      - skin_color_score
+      - flesh_firmness_kg
+      - disease_resistance_score
+      - tree_vigor_score
+      - yield_kg_per_tree
+      - days_to_maturity
+      - fruit_length_mm
+      - fruit_width_mm
+    seasons: ["2023-2024", "2024-2025", "2025-2026"]
+    sites: ["Hoedspruit_A", "Hoedspruit_B", "Tzaneen_C"]
+    
+  - name: "citrus"
+    traits:
+      - fruit_weight_g
+      - brix_content
+      - acidity_percent
+      - juice_content_ml
+      - rind_thickness_mm
+      - seed_count
+      - yield_kg_per_tree
+      - days_to_maturity
+    seasons: ["2023-2024", "2024-2025", "2025-2026"]
+    sites: ["Hoedspruit_A", "Letsitele_D"]
+
+validation:
+  missing_threshold: 0.15       # Flag if >15% missing in a trait
+  outlier_method: "iqr"         # IQR-based outlier detection
+  outlier_multiplier: 2.5
+  duplicate_check: true
+  range_checks:
+    fruit_weight_g: [50, 2000]
+    brix_content: [5, 30]
+    skin_color_score: [1, 9]
+    flesh_firmness_kg: [0.5, 15]
+    disease_resistance_score: [1, 9]
+    tree_vigor_score: [1, 9]
+    yield_kg_per_tree: [0, 500]
+    days_to_maturity: [60, 365]
+    fruit_length_mm: [20, 300]
+    fruit_width_mm: [20, 200]
+    acidity_percent: [0.1, 5.0]
+    juice_content_ml: [10, 500]
+    rind_thickness_mm: [1, 15]
+    seed_count: [0, 50]
+
+qaqc_reports:
+  output_dir: "reports/"
+  generate_plots: true
+  flag_colors:
+    critical: "red"
+    warning: "orange"
+    info: "blue"

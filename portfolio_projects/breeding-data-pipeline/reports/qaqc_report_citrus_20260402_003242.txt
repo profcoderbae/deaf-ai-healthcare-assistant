@@ -1,0 +1,176 @@
+======================================================================
+  BREEDING DATA QA/QC REPORT — CITRUS
+  Generated: 2026-04-02 00:32:50
+======================================================================
+
+DATASET OVERVIEW
+----------------------------------------
+Total records:      1,707
+Unique genotypes:   100
+Sites:              Hoedspruit_A, Letsitele_D
+Seasons:            2023-2024, 2024-2025, 2025-2026
+Evaluators:         KM_01, TM_01, TM_02
+
+QC STATUS SUMMARY
+----------------------------------------
+  PASS        :  1,682 (98.5%)
+  WARNING     :     25 (1.5%)
+
+VALIDATION ISSUES
+----------------------------------------
+
+  [CRITICAL] — 34 issues
+    • [missing_data_by_site] Site Hoedspruit_A: acidity_percent missing rate 60.4%
+    • [missing_data_by_site] Site Hoedspruit_B: acidity_percent missing rate 100.0%
+    • [missing_data_by_site] Site Tzaneen_C: acidity_percent missing rate 100.0%
+    • [missing_data_by_site] Site Hoedspruit_A: juice_content_ml missing rate 60.4%
+    • [missing_data_by_site] Site Hoedspruit_B: juice_content_ml missing rate 100.0%
+    • [missing_data_by_site] Site Tzaneen_C: juice_content_ml missing rate 100.0%
+    • [missing_data_by_site] Site Hoedspruit_A: rind_thickness_mm missing rate 60.0%
+    • [missing_data_by_site] Site Hoedspruit_B: rind_thickness_mm missing rate 100.0%
+    • [missing_data_by_site] Site Tzaneen_C: rind_thickness_mm missing rate 100.0%
+    • [missing_data_by_site] Site Hoedspruit_A: seed_count missing rate 60.4%
+    • [missing_data_by_site] Site Hoedspruit_B: seed_count missing rate 100.0%
+    • [missing_data_by_site] Site Tzaneen_C: seed_count missing rate 100.0%
+    • [missing_data_by_site] Site Hoedspruit_A: skin_color_score missing rate 41.6%
+    • [missing_data_by_site] Site Letsitele_D: skin_color_score missing rate 100.0%
+    • [missing_data_by_site] Site Hoedspruit_A: flesh_firmness_kg missing rate 41.9%
+    • [missing_data_by_site] Site Letsitele_D: flesh_firmness_kg missing rate 100.0%
+    • [missing_data_by_site] Site Hoedspruit_A: disease_resistance_score missing rate 41.7%
+    • [missing_data_by_site] Site Letsitele_D: disease_resistance_score missing rate 100.0%
+    • [missing_data_by_site] Site Hoedspruit_A: tree_vigor_score missing rate 41.9%
+    • [missing_data_by_site] Site Letsitele_D: tree_vigor_score missing rate 100.0%
+    • [missing_data_by_site] Site Hoedspruit_A: fruit_length_mm missing rate 42.3%
+    • [missing_data_by_site] Site Letsitele_D: fruit_length_mm missing rate 100.0%
+    • [missing_data_by_site] Site Hoedspruit_A: fruit_width_mm missing rate 41.7%
+    • [missing_data_by_site] Site Letsitele_D: fruit_width_mm missing rate 100.0%
+    • [range_violation] 13 values outside [50, 2000]
+    • [range_violation] 27 values outside [5, 30]
+    • [range_violation] 61 values outside [0.5, 15]
+    • [range_violation] 7 values outside [0, 500]
+    • [range_violation] 32 values outside [60, 365]
+    • [range_violation] 29 values outside [20, 300]
+    • [range_violation] 14 values outside [20, 200]
+    • [range_violation] 2 values outside [0.1, 5.0]
+    • [range_violation] 5 values outside [10, 500]
+    • [range_violation] 2 values outside [1, 15]
+
+  [WARNING] — 97 issues
+    • [missing_data] Missing rate 69.6% exceeds threshold 15%
+    • [missing_data] Missing rate 69.6% exceeds threshold 15%
+    • [missing_data] Missing rate 69.4% exceeds threshold 15%
+    • [missing_data] Missing rate 69.5% exceeds threshold 15%
+    • [missing_data] Missing rate 32.2% exceeds threshold 15%
+    • [missing_data] Missing rate 32.7% exceeds threshold 15%
+    • [missing_data] Missing rate 32.5% exceeds threshold 15%
+    • [missing_data] Missing rate 32.8% exceeds threshold 15%
+    • [missing_data] Missing rate 32.8% exceeds threshold 15%
+    • [missing_data] Missing rate 32.3% exceeds threshold 15%
+    • [outlier] 2 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 2 outliers detected (IQR x2.5)
+    • [outlier] 2 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 3 outliers detected (IQR x2.5)
+    • [outlier] 3 outliers detected (IQR x2.5)
+    • [outlier] 3 outliers detected (IQR x2.5)
+    • [outlier] 3 outliers detected (IQR x2.5)
+    • [outlier] 2 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 4 outliers detected (IQR x2.5)
+    • [outlier] 3 outliers detected (IQR x2.5)
+    • [outlier] 3 outliers detected (IQR x2.5)
+    • [outlier] 3 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 2 outliers detected (IQR x2.5)
+    • [outlier] 2 outliers detected (IQR x2.5)
+    • [outlier] 2 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 5 outliers detected (IQR x2.5)
+    • [outlier] 3 outliers detected (IQR x2.5)
+    • [outlier] 2 outliers detected (IQR x2.5)
+    • [outlier] 2 outliers detected (IQR x2.5)
+    • [outlier] 2 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 2 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 4 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 2 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 4 outliers detected (IQR x2.5)
+    • [outlier] 2 outliers detected (IQR x2.5)
+    • [outlier] 4 outliers detected (IQR x2.5)
+    • [outlier] 3 outliers detected (IQR x2.5)
+    • [outlier] 2 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 2 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 4 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 11 outliers detected (IQR x2.5)
+    • [outlier] 13 outliers detected (IQR x2.5)
+    • [outlier] 3 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 2 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 2 outliers detected (IQR x2.5)
+    • [outlier] 3 outliers detected (IQR x2.5)
+    • [outlier] 2 outliers detected (IQR x2.5)
+    • [outlier] 5 outliers detected (IQR x2.5)
+    • [outlier] 4 outliers detected (IQR x2.5)
+    • [outlier] 8 outliers detected (IQR x2.5)
+    • [outlier] 5 outliers detected (IQR x2.5)
+    • [outlier] 5 outliers detected (IQR x2.5)
+    • [outlier] 7 outliers detected (IQR x2.5)
+    • [outlier] 5 outliers detected (IQR x2.5)
+    • [outlier] 6 outliers detected (IQR x2.5)
+    • [outlier] 7 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 2 outliers detected (IQR x2.5)
+    • [outlier] 3 outliers detected (IQR x2.5)
+    • [outlier] 7 outliers detected (IQR x2.5)
+    • [outlier] 3 outliers detected (IQR x2.5)
+    • [outlier] 2 outliers detected (IQR x2.5)
+    • [outlier] 6 outliers detected (IQR x2.5)
+    • [outlier] 4 outliers detected (IQR x2.5)
+    • [outlier] 3 outliers detected (IQR x2.5)
+    • [outlier] 2 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 3 outliers detected (IQR x2.5)
+    • [outlier] 3 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+    • [outlier] 2 outliers detected (IQR x2.5)
+    • [outlier] 1 outliers detected (IQR x2.5)
+
+TRAIT SUMMARY STATISTICS
+----------------------------------------
+                           count        mean        std         min         max   missing_%
+fruit_weight_g            1675.0  180.720481  28.153567   79.230000  482.590000    1.874634
+brix_content              1664.0   11.444624   1.460958    6.130000   24.560000    2.519039
+acidity_percent           1671.0    1.219662   0.367714    0.130000    2.710000    2.108963
+juice_content_ml          1672.0   85.115247  14.567690   25.145000  145.010000    2.050381
+rind_thickness_mm         1681.0    4.573689   0.910460    1.540000    8.321250    1.523140
+seed_count                1672.0    8.031699   3.557119    0.000000   20.000000    2.050381
+yield_kg_per_tree         1674.0  121.170808  21.302958   12.650000  228.880000    1.933216
+days_to_maturity          1663.0  239.256380  17.347718  176.750000  293.580000    2.577622
+skin_color_score             0.0         NaN        NaN         NaN         NaN  100.000000
+flesh_firmness_kg            0.0         NaN        NaN         NaN         NaN  100.000000
+disease_resistance_score     0.0         NaN        NaN         NaN         NaN  100.000000
+tree_vigor_score             0.0         NaN        NaN         NaN         NaN  100.000000
+fruit_length_mm              0.0         NaN        NaN         NaN         NaN  100.000000
+fruit_width_mm               0.0         NaN        NaN         NaN         NaN  100.000000
+fruit_shape_index            0.0         NaN        NaN         NaN         NaN  100.000000
+brix_acid_ratio           1629.0   10.688446   6.367625    3.416667   99.714286    4.569420
+yield_efficiency             0.0         NaN        NaN         NaN         NaN  100.000000
